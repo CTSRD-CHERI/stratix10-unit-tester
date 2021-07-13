@@ -1,5 +1,6 @@
 // The MIT License (MIT)
 //
+// Copyright (c) 2021 Simon W. Moore
 // Copyright (c) 2014 Paulo Matias
 // Copyright (c) 2016 A. Theodore Markettos
 // 
@@ -21,21 +22,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import FIFOF::*;
-import GetPut::*;
-export GetPut::*;
+package AlteraJtagUart;
 
-export JtagByte(..);
-export AlteraJtagUart(..);
+import FIFOF        :: *;
+import GetPut       :: *;
+import ClientServer :: *;
+
+export AlteraJtagUart;
 export mkAlteraJtagUart;
 
-typedef Bit#(8) JtagByte;
 
 interface AltJtagAtlantic;
     method Bool can_write_next_cycle();
-    method Action write(JtagByte data);
+    method Action write(Bit#(8) data);
     method Action ask_read();
-    method JtagByte read();
+    method Bit#(8) read();
 endinterface
 
 import "BVI" alt_jtag_atlantic =
@@ -66,16 +67,13 @@ import "BVI" alt_jtag_atlantic =
         schedule (read) CF (read);
     endmodule
 
-interface AlteraJtagUart;
-    interface Put#(JtagByte) tx;
-    interface Get#(JtagByte) rx;
-endinterface
+typedef Client#(Bit#(8), Bit#(8)) AlteraJtagUart;
 
 module mkAlteraJtagUart#(Integer log2rx, Integer log2tx, Bit#(8) sld_instance, Integer instance_auto) (AlteraJtagUart);
     AltJtagAtlantic atlantic <- mkAltJtagAtlantic(log2rx, log2tx, sld_instance, instance_auto);
-    FIFOF#(JtagByte) rxfifo <- mkSizedFIFOF(2**log2rx);
-    FIFOF#(JtagByte) txfifo <- mkSizedFIFOF(2**log2tx);
-    Reg#(Bool) can_tx <- mkReg(False);
+    FIFOF#(Bit#(8)) rxfifo   <- mkSizedFIFOF(2**log2rx);
+    FIFOF#(Bit#(8)) txfifo   <- mkSizedFIFOF(2**log2tx);
+    Reg#(Bool)      can_tx   <- mkReg(False);
 
     rule ask_tx;
         can_tx <= atlantic.can_write_next_cycle;
@@ -91,9 +89,9 @@ module mkAlteraJtagUart#(Integer log2rx, Integer log2tx, Bit#(8) sld_instance, I
         rxfifo.enq(atlantic.read());
     endrule
 
-    interface Put tx = toPut(txfifo);
-    interface Get rx = toGet(rxfifo);
+    interface request  = toGet(rxfifo);
+    interface response = toPut(txfifo);
 endmodule
 
   
-endmodule
+endpackage: AlteraJtagUart
