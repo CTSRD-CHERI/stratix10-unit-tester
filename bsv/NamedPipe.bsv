@@ -32,8 +32,10 @@ package NamedPipe;
 
 export mkPipeReader;
 export mkPipeWriter;
+export mkPipeClient;
 
-import GetPut :: *;
+import GetPut         :: *;
+import ClientServer   :: *;
 
 import "BVI" PipeReader_V =
 module mkPipeReader(Get#(Bit#(8)));
@@ -51,5 +53,14 @@ module mkPipeWriter(Put#(Bit#(8)));
   default_reset rst (RST_N);
   schedule put C put;
 endmodule: mkPipeWriter
+
+
+module mkPipeClient(Client#(Bit#(8),Bit#(8)));
+    Get#(Bit#(8)) rx <- mkPipeReader;
+    Put#(Bit#(8)) tx <- mkPipeWriter;
+    interface request  = rx;
+    interface response = tx;
+endmodule
+
   
 endpackage: NamedPipe
