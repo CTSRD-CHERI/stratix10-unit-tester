@@ -44,7 +44,7 @@ module mkDebugChannel(DebugChannel);
 `ifdef BSIM
   DebugChannel   uart <- mkPipeClient();
 `else
-  AlteraJtagUart uart <- mkAlteraJtagUary(6, 6, 0, 0);;
+  AlteraJtagUart uart <- mkAlteraJtagUart(6, 6, 0, 0);
 `endif
   return uart;
 endmodule: mkDebugChannel
