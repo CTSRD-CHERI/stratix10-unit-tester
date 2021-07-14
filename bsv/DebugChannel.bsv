@@ -35,8 +35,11 @@ export mkDebugChannel;
 
 import GetPut         :: *;
 import ClientServer   :: *;
-import AlteraJtagUart :: *;
-import NamedPipePure  :: *;
+`ifdef BSIM
+  import NamedPipePure  :: *;
+`else
+  import AlteraJtagUart :: *;
+`endif
 
 typedef Client#(Bit#(8), Bit#(8)) DebugChannel;
 
