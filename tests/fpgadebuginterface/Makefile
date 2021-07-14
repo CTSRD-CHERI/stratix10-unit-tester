@@ -32,7 +32,7 @@ SIMI_DIR = ./output_files
 VERILOG_INCLUDES =				\
 	$(RTL_PATH)/PipeReader_V.v		\
 	$(RTL_PATH)/PipeWriter_V.v		\
-	$(SIMI_DIR)/rtl/mkFPGADebugInterface.v
+	$(SIMI_DIR)/mkFPGADebugInterface.v
 
 TOP_MODULE = top
 
@@ -53,7 +53,7 @@ BSC_SIM_FLAGS = -opt-undetermined-vals		\
 		-D BSIM				\
 		-verilog
 
-IVERILOG_FLAGS = -DBSV_NO_INITIAL_BLOCKS
+IVERILOG_FLAGS = -DBSV_NO_INITIAL_BLOCKS -DBSIM
 
 .PHONY: all
 all: simi
@@ -81,7 +81,7 @@ runsimi: $(IVERILOG_SIM)
 	$(IVERILOG_SIM)
 	rm bytepipe-host2hw bytepipe-hw2host
 
-$(IVERILOG_SIM): $(SIMI_DIR)/rtl $(SIMI_DIR)/rtl/$(TOP_MODULE).v $(GENERIC_SIM_DIR)/$(IVERILOG_WRAPPER) $(VERILOG_INCLUDES)
+$(IVERILOG_SIM): $(SIMI_DIR) $(SIMI_DIR)/$(TOP_MODULE).v $(GENERIC_SIM_DIR)/$(IVERILOG_WRAPPER) $(VERILOG_INCLUDES)
 	cp $(GENERIC_SIM_DIR)/$(IVERILOG_WRAPPER) $(SIMI_DIR)
 	iverilog $(IVERILOG_FLAGS) 			\
 		 -y $(BLUESPEC_VERILOG) 		\
@@ -90,18 +90,18 @@ $(IVERILOG_SIM): $(SIMI_DIR)/rtl $(SIMI_DIR)/rtl/$(TOP_MODULE).v $(GENERIC_SIM_D
 		 -s sim 				\
 		 wrapper-iverilog.v			\
 		$(VERILOG_INCLUDES)			\
-		 $(SIMI_DIR)/rtl/top.v
+		 $(SIMI_DIR)/top.v
 
-$(SIMI_DIR)/rtl/$(TOP_MODULE).v: $(SIMI_DIR)/rtl $(RTL) $(BSV_LIBS)
+$(SIMI_DIR)/$(TOP_MODULE).v: $(SIMI_DIR) $(RTL) $(BSV_LIBS)
 	bsc $(BSC_SIM_FLAGS) 				\
 		-vsim iverilog				\
 	    	-simdir $(SIMI_DIR)    			\
-	    	-vdir $(SIMI_DIR)/rtl			\
+	    	-vdir $(SIMI_DIR)			\
 		-p +:$(RTL_PATH)                        \
 	    	-g $(TOP_MODULE) -u $(TOP_RTL)
 
-$(SIMI_DIR)/rtl:
-	mkdir -p $(SIMI_DIR)/rtl
+$(SIMI_DIR):
+	mkdir -p $(SIMI_DIR)
 
 #-----------------------------------------------------------------------------
 # clean up
@@ -109,3 +109,4 @@ clean:
 	rm -rf $(SIMI_DIR)
 	rm -rf __pycache__
 	rm -f *.bo
+	make -C $(RTL_PATH)
