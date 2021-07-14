@@ -22,8 +22,8 @@
 # ----------------------------------------------------------------------------
 # Library to use the hardware FPGADebugInterface
 
-import os
-import fcntl
+import fpga_debug_pipe_sim
+import fpga_debug_pipe_fpga
 import time
 from enum import Enum
 
@@ -44,25 +44,17 @@ class DebugResponseCode(Enum):
     Rsp_checksum_fail = 254
     Rsp_invalid       = 255
 
-# default pipe FIFO names in the file system
-FIFO_PY2V = 'bytepipe-host2hw'
-FIFO_V2PY = 'bytepipe-hw2host'
-
-class pipe_interface:
-    def __init__(self):
-        self.fifo_tx = open(FIFO_PY2V,'wb')
-        self.fifo_rx = open(FIFO_V2PY,'rb', buffering=0)
-        fd_rx = self.fifo_rx.fileno()
-        flag_rx = fcntl.fcntl(fd_rx, fcntl.F_GETFL)
-        fcntl.fcntl(fd_rx, fcntl.F_SETFL, flag_rx | os.O_NONBLOCK | os.O_ASYNC)
-        fd_tx = self.fifo_tx.fileno()
-        flag_tx = fcntl.fcntl(fd_tx, fcntl.F_GETFL)
-        fcntl.fcntl(fd_tx, fcntl.F_SETFL, flag_tx | os.O_NONBLOCK | os.O_ASYNC)
+class debug_interface:
+    def __init__(self, sim=True):
+        self.sim_mode = sim
+        if(sim):
+            self.pipe = fpga_debug_pipe_sim.pipe_interface()
+        else:
+            self.pipe = fpga_debug_pipe_fpga.pipe_interface()
 
     # send a byte over the communications channel
     def put_byte(self, b: int):
-        self.fifo_tx.write(b.to_bytes(1,"little"))
-        self.fifo_tx.flush()
+        self.pipe.put_byte(b)
         print("DEBUG: put_byte 0x%02x" % (b))
 
     def put_command(self, cmd: DebugCommand, index: int, data: int):
@@ -76,29 +68,10 @@ class pipe_interface:
             data = data<<8
         self.put_byte(checksum)
 
-    def get_byte_async(self):
-        return self.fifo_rx.read(1)  # returns None if nothing to read
-
     def get_byte(self):
-        try_read = 1000
-        # self.put_byte(0);  # HACK!!! - unblock $fgetc() in PipeReader_V.v
-        while(try_read>0):
-            c = self.get_byte_async()
-            if(c!=None):
-                b = int.from_bytes(c,"little")
-                try_read = -1
-            else:
-                try_read = try_read-1;
-                if(try_read<100):
-                    time.sleep(0.1)
-        if(try_read==0):
-            print("Failed to read a byte over the debug channel")
-        if(c!=None):
-            i = int.from_bytes(c,"little")
-            print("DEBUG: get_byte = 0x%02x" % (i))
-            return i
-        else:
-            return None
+        b = self.pipe.get_byte()
+        print("DEBUG: get_byte = 0x%02x" % b)
+        return b
 
     def get_response_code(self):
         b = self.get_byte()
@@ -119,6 +92,9 @@ class pipe_interface:
     def write(self, index: int, data: int):
         self.put_command(DebugCommand.Cmd_write_word, index, data)
         code = self.get_response_code()
+        while(code == DebugResponseCode.Rsp_nop):
+            code = self.get_response_code()
+            code = self.get_response_code()
         if(code != DebugResponseCode.Rsp_write_ack):
             print("DEBUG: write failed - received response: ",code)
         checksum = self.get_byte()
@@ -128,6 +104,9 @@ class pipe_interface:
     def read(self, index: int) -> int:
         self.put_command(DebugCommand.Cmd_read_word, index, 0)
         code = self.get_response_code()
+        while(code == DebugResponseCode.Rsp_nop):
+            code = self.get_response_code()
+            code = self.get_response_code()
         if(code != DebugResponseCode.Rsp_read_data):
             print("DEBUG: read failed - received response: ",code)
             #################### TODO: drain recieve buffer?
@@ -138,6 +117,12 @@ class pipe_interface:
             if(cs != self.get_response_checksum):
                 print("DEBUG: checksum error")
             return d
-        
+
+    def clear(self):
+        for j in range(12):
+            self.put_byte(0)
+        self.pipe.clear_read_buf()
+
     def end_simulation(self):
-        self.put_command(DebugCommand.Cmd_end_sim, 0, 0)
+        if(self.sim_mode):
+            self.put_command(DebugCommand.Cmd_end_sim, 0, 0)
