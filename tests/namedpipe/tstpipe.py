@@ -41,7 +41,7 @@ flag_rx = fcntl.fcntl(fd_rx, fcntl.F_GETFL)
 fcntl.fcntl(fd_rx, fcntl.F_SETFL, flag_rx | os.O_NONBLOCK)
 
 error = False
-for j in range(255,-1,-1):
+for j in range(255,0,-1):
     fifo_tx.write(j.to_bytes(1,"little"))
     fifo_tx.flush()
     print("Wrote %02x" % (j))
@@ -57,7 +57,9 @@ for j in range(255,-1,-1):
             try_read = try_read-1;
             if(try_read<30):
                 print("Read failed - retry")
-                time.sleep(0.5)
+                time.sleep(0.1)
+            else:
+                time.sleep(0.01)
     expect = j ^ 0x55
     if(b!=expect):
         print("ERROR: received %02x but expecting %02x" % (b, expect))
