@@ -36,7 +36,7 @@ export mkDebugChannel;
 import GetPut         :: *;
 import ClientServer   :: *;
 import AlteraJtagUart :: *;
-import NamedPipe      :: *;
+import NamedPipePure  :: *;
 
 typedef Client#(Bit#(8), Bit#(8)) DebugChannel;
 
