@@ -26,7 +26,7 @@
 
 import fpga_debug_interface
 
-dbg = fpga_debug_interface.pipe_interface()
+dbg = fpga_debug_interface.debug_interface(False)  # True=simulate, False=on FPGA
 error = False
 
 def read_check(idx, expected):
@@ -36,6 +36,7 @@ def read_check(idx, expected):
         error = True
 
 def run_simple_test():
+    dbg.clear()
     dbg.write(0,3)
     dbg.write(2,7)
     dbg.write(3,13)
