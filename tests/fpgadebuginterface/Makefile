@@ -109,4 +109,4 @@ clean:
 	rm -rf $(SIMI_DIR)
 	rm -rf __pycache__
 	rm -f *.bo
-	make -C $(RTL_PATH)
+	make -C $(RTL_PATH) clean

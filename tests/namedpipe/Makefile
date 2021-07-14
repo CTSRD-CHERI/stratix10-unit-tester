@@ -103,4 +103,4 @@ $(SIMI_DIR):
 clean:
 	rm -rf $(SIMI_DIR)
 	rm -f *.bo
-	make -C $(RTL_PATH)
+	make -C $(RTL_PATH) clean
