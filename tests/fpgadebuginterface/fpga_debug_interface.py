@@ -56,6 +56,7 @@ class debug_interface:
         checksum = self.pipe.calc_checksum(packet_list[0:-1])
         if(checksum != packet_list[-1]):
             print(error_message)
+            raise DebugInterfaceChecksumError
             
     def put_command(self, cmd: DebugCommand, index: int, data: int):
         packet = [cmd.value, index]+list(data.to_bytes(8,"big"))
@@ -93,3 +94,6 @@ class debug_interface:
     def end_simulation(self):
         if(self.sim_mode):
             self.put_command(DebugCommand.Cmd_end_sim, 0, 0)
+
+class DebugInterfaceChecksumError(Exception):
+    pass

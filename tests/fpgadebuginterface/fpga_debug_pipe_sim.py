@@ -60,6 +60,7 @@ class pipe_interface:
         
     def __get_byte(self):
         try_read = 1000
+        c=None
         while(try_read>0):
             c = self.__get_byte_async()
             if(c!=None):
@@ -71,16 +72,17 @@ class pipe_interface:
                     time.sleep(0.1)
                 else:
                     time.sleep(0.01)
-        if(try_read==0):
+        if(c==None):
             print("Failed to read a byte over the debug channel")
-        if(c!=None):
-            i = int.from_bytes(c,"little")
-            return i
-        else:
-            return None
+            raise PipeReadError
+        i = int.from_bytes(c,"little")
+        return i
 
     def get_bytes(self, nbytes):
         packet_list = []
         for j in range(nbytes):
             packet_list.append(self.__get_byte())
         return packet_list
+
+class PipeReadError(Exception):
+    pass
