@@ -52,10 +52,11 @@ class pipe_interface:
             self.read_buf = self.read_buf[nbytes:]
             return r
         else:
-            return None
+            raise PipeChecksumError
 
     def clear_read_buf(self):
         while(self.uart.bytes_available()>0):
             b = self.get_bytes(self.uart_bytes_available())
-        self.read_buf=[]
         
+class PipeChecksumError(Exception):
+    pass

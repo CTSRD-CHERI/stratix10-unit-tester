@@ -36,7 +36,7 @@ VERILOG_INCLUDES =				\
 
 TOP_MODULE = top
 
-PYTHON_TESTER = tstdebug.py
+PYTHON_TESTER = tstdebug.py --sim
 
 GENERIC_SIM_DIR = ./
 IVERILOG_WRAPPER = wrapper-iverilog.v
@@ -64,7 +64,7 @@ test: simi
 	@mkfifo bytepipe-host2hw
 	@mkfifo bytepipe-hw2host
 	$(IVERILOG_SIM) > $(SIMI_DIR)/iverilog.log &
-	python3 $(PYTHON_TESTER) | grep "Test result"
+	python3 $(PYTHON_TESTER)
 	@rm bytepipe-host2hw bytepipe-hw2host
 
 #-----------------------------------------------------------------------------
