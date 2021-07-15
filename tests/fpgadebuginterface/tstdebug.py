@@ -26,7 +26,7 @@
 
 import fpga_debug_interface
 
-dbg = fpga_debug_interface.debug_interface(False)  # True=simulate, False=on FPGA
+dbg = fpga_debug_interface.debug_interface(sim=False)  # True=simulate, False=on FPGA
 error = False
 
 def read_check(idx, expected):
@@ -34,21 +34,27 @@ def read_check(idx, expected):
     if(r != expected):
         print("ERROR: reg[%1d]=%2d but expected %2d" % (idx, r, expected))
         error = True
+    else:
+        print("reg[%1d] == %2d" % (idx, r))
 
+def write_report(idx, data):
+    dbg.write(idx, data)
+    print("reg[%1d] <= %2d" % (idx, data))
+    
 def run_simple_test():
     dbg.clear()
-    dbg.write(0,3)
-    dbg.write(2,7)
-    dbg.write(3,13)
-    dbg.write(1,17)
+    write_report(0,3)
+    write_report(2,7)
+    write_report(3,13)
+    write_report(1,17)
     read_check(0,3)
     read_check(2,7)
     read_check(3,13)
     read_check(1,17)
-    dbg.write(4,3)
-    dbg.write(5,3)
-    dbg.write(6,3)
-    dbg.write(7,3)
+    write_report(4,3)
+    write_report(5,3)
+    write_report(6,3)
+    write_report(7,3)
     read_check(0,6)
     read_check(1,20)
     read_check(2,10)
