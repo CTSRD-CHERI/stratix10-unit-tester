@@ -24,46 +24,38 @@
 
 import intel_jtag_uart
 import time
+from functools import reduce
 
 class pipe_interface:
     def __init__(self):
         self.uart = intel_jtag_uart.intel_jtag_uart()
-        self.read_buf = []
+        self.read_buf = list()
 
-    # send a byte over the communications channel
-    def put_byte(self, b: int):
-        self.uart.write(b.to_bytes(1,"little"))
+    def calc_checksum(self, packet_list) -> int:
+        return reduce(lambda a,b: a+b, packet_list + [0x55,0x00]) & 0xff
+    
+    def put_bytes(self, bytes_list):
+        self.uart.write(bytes(bytes_list))
 
-    def get_byte_async(self):
-        if(len(self.read_buf)==0):
+    def get_bytes(self, nbytes):
+        try_read = 1000
+        while((len(self.read_buf) < nbytes) and (try_read>0)):
+            try_read = try_read-1
             if(self.uart.bytes_available()>0):
-                self.read_buf=list(self.uart.read())
-                print("DEBUG: read in bytes: ")
-                print(self.read_buf)
-                print("DEBUG: read len: ",len(self.read_buf))
+                new_bytes = list(self.uart.read())
+                self.read_buf = self.read_buf + new_bytes
+                try_read = -1
             else:
-                return None
-        first_byte = self.read_buf[0]
-        self.read_buf.pop(0)
-        print("DEBUG: get_byte_async returning: 0x%02x" % (first_byte))
-        return first_byte
+                time.sleep(0.1 if try_read<20 else 0.01)
+        if(len(self.read_buf) >= nbytes):
+            r = self.read_buf[0:nbytes]
+            self.read_buf = self.read_buf[nbytes:]
+            return r
+        else:
+            return None
 
     def clear_read_buf(self):
         while(self.uart.bytes_available()>0):
-            b = self.uart.read()
-        self.read_buf=b''
+            b = self.get_bytes(self.uart_bytes_available())
+        self.read_buf=[]
         
-    def get_byte(self):
-        try_read = 1000
-        c=None
-        while(try_read>0):
-            c = self.get_byte_async()
-            if(c!=None):
-                try_read = -1
-            else:
-                try_read = try_read-1;
-                if(try_read<100):
-                    time.sleep(0.1)
-        if(try_read==0):
-            print("Time out trying to read a byte over the debug channel")
-        return c

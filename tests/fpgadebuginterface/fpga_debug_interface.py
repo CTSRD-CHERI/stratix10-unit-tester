@@ -52,75 +52,42 @@ class debug_interface:
         else:
             self.pipe = fpga_debug_pipe_fpga.pipe_interface()
 
-    # send a byte over the communications channel
-    def put_byte(self, b: int):
-        self.pipe.put_byte(b)
-        print("DEBUG: put_byte 0x%02x" % (b))
-
+    def assert_checksum(self, packet_list, error_message):
+        checksum = self.pipe.calc_checksum(packet_list[0:-1])
+        if(checksum != packet_list[-1]):
+            print(error_message)
+            
     def put_command(self, cmd: DebugCommand, index: int, data: int):
-        checksum = (0x55 + cmd.value + index) & 0xff
-        self.put_byte(cmd.value)
-        self.put_byte(index)
-        for j in range(8):
-            b = data >> (64-8)
-            self.put_byte(b)
-            checksum = checksum+b
-            data = data<<8
-        self.put_byte(checksum)
-
-    def get_byte(self):
-        b = self.pipe.get_byte()
-        print("DEBUG: get_byte = 0x%02x" % b)
-        return b
+        packet = [cmd.value, index]+list(data.to_bytes(8,"big"))
+        checksum = self.pipe.calc_checksum(packet)
+        # print("DEBUG: put_command sending: [",", ".join(list(map(lambda a: "0x%02x"%(a), packet+[checksum]))),"]")
+        self.pipe.put_bytes(packet+[checksum])
 
     def get_response_code(self):
-        b = self.get_byte()
-        #print("DEBUG: Response byte: ",b)
-        code = DebugResponseCode(b)
-        #print("DEBUG: Response code: ",code)
-        self.get_response_checksum = (0x55 + code.value) & 0xff
+        resp = self.pipe.get_bytes(2)
+        code = DebugResponseCode(resp[0])
+        self.assert_checksum(resp, "ERROR: checksum failed on get_response_code")
         return code
-
-    def get_response_data(self):
-        d = 0;
-        for j in range(8):
-            b = self.get_byte()
-            d = d<<8 | b
-            self.get_response_checksum = self.get_response_checksum + b
-        return d
 
     def write(self, index: int, data: int):
         self.put_command(DebugCommand.Cmd_write_word, index, data)
         code = self.get_response_code()
-        while(code == DebugResponseCode.Rsp_nop):
-            code = self.get_response_code()
-            code = self.get_response_code()
         if(code != DebugResponseCode.Rsp_write_ack):
-            print("DEBUG: write failed - received response: ",code)
-        checksum = self.get_byte()
-        if(checksum != self.get_response_checksum):
-            print("DEBUG: checksum error")
+            print("ERROR write failed - received response: ",code)
             
     def read(self, index: int) -> int:
         self.put_command(DebugCommand.Cmd_read_word, index, 0)
-        code = self.get_response_code()
-        while(code == DebugResponseCode.Rsp_nop):
-            code = self.get_response_code()
-            code = self.get_response_code()
+        resp = self.pipe.get_bytes(10)
+        code = DebugResponseCode(resp[0])
         if(code != DebugResponseCode.Rsp_read_data):
-            print("DEBUG: read failed - received response: ",code)
-            #################### TODO: drain recieve buffer?
+            print("ERROR read failed - received response: ",code)
             return None
         else:
-            d = self.get_response_data()
-            cs = self.get_byte()
-            if(cs != self.get_response_checksum):
-                print("DEBUG: checksum error")
-            return d
+            self.assert_checksum(resp,"ERROR checksum error for read()")
+            return int.from_bytes(bytes(resp[1:9]),"big")
 
     def clear(self):
-        for j in range(12):
-            self.put_byte(0)
+        self.pipe.put_bytes([0]*12)
         self.pipe.clear_read_buf()
 
     def end_simulation(self):
