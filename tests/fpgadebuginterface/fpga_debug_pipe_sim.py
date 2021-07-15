@@ -25,7 +25,7 @@
 import os
 import fcntl
 import time
-from enum import Enum
+from functools import reduce
 
 # default pipe FIFO names in the file system
 FIFO_PY2V = 'bytepipe-host2hw'
@@ -42,24 +42,26 @@ class pipe_interface:
         flag_tx = fcntl.fcntl(fd_tx, fcntl.F_GETFL)
         fcntl.fcntl(fd_tx, fcntl.F_SETFL, flag_tx | os.O_NONBLOCK | os.O_ASYNC)
 
-    # send a byte over the communications channel
-    def put_byte(self, b: int):
-        self.fifo_tx.write(b.to_bytes(1,"little"))
+    def calc_checksum(self, packet_list) -> int:
+        return reduce(lambda a,b: a+b, packet_list + [0x55,0x00]) & 0xff
+    
+    def put_bytes(self, bytes_list):
+        b = bytes(bytes_list)
+        self.fifo_tx.write(b)
         self.fifo_tx.flush()
-
-    def get_byte_async(self):
-        return self.fifo_rx.read(1)  # returns None if nothing to read
+        
+    def __get_byte_async(self):
+        return self.fifo_rx.read(1)  # async read
 
     def clear_read_buf(self):
         for try_read in range(100):
-            c = self.get_byte_async()
+            c = self.__get_byte_async()
             time.sleep(0.01)
         
-    def get_byte(self):
+    def __get_byte(self):
         try_read = 1000
-        # self.put_byte(0);  # HACK!!! - unblock $fgetc() in PipeReader_V.v
         while(try_read>0):
-            c = self.get_byte_async()
+            c = self.__get_byte_async()
             if(c!=None):
                 b = int.from_bytes(c,"little")
                 try_read = -1
@@ -76,3 +78,9 @@ class pipe_interface:
             return i
         else:
             return None
+
+    def get_bytes(self, nbytes):
+        packet_list = []
+        for j in range(nbytes):
+            packet_list.append(self.__get_byte())
+        return packet_list
