@@ -3,6 +3,12 @@
 # Copyright (c) 2021 Simon W. Moore
 # All rights reserved.
 #
+# This software was developed at the University of Cambridge Computer
+# Laboratory (Department of Computer Science and Technology) based
+# upon work supported by the DoD Information Analysis Center Program
+# Management Office (DoD IAC PMO), sponsored by the Defense
+# Technical Information Center (DTIC) under Contract No. FA807518D0004.
+#
 # This software was developed by SRI International and the University of
 # Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
 # ("CTSRD"), as part of the DARPA CRASH research programme.
@@ -25,6 +31,9 @@
 #
 # @BERI_LICENSE_HEADER_END@
 #
+
+.PHONY: help
+	@echo "This directory contains libraries, so nothing to build here!"
 
 .PHONY: clean
 clean:
