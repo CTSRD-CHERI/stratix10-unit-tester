@@ -1,3 +1,4 @@
+// Trivial iVerilog top-level to provide clock and reset
 module sim(output CLK, output RST_N);
    reg CLK;
    reg RST_N;
