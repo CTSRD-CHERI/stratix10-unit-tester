@@ -1,6 +1,12 @@
 # Copyright (c) 2021 Simon W. Moore
 # All rights reserved.
 #
+# This software was developed at the University of Cambridge Computer
+# Laboratory (Department of Computer Science and Technology) based
+# upon work supported by the DoD Information Analysis Center Program
+# Management Office (DoD IAC PMO), sponsored by the Defense
+# Technical Information Center (DTIC) under Contract No. FA807518D0004.
+#
 # @BERI_LICENSE_HEADER_START@
 #
 # Licensed to BERI Open Systems C.I.C. (BERI) under one or more contributor
@@ -24,19 +30,16 @@
 
 SIM_NAME = FPGADebugInterface
 RTL_PATH = ../../bsv
+DE10_PATH = ../../de10
+PATH_DE10_TO_HERE = ../tests/fpgadebuginterface
 TOP_RTL = tst$(SIM_NAME).bsv
-RTL = $(TOP_RTL)
+TOP_MODULE = top
+PYTHON_TESTER = tstdebug.py
+
 # iverilog simulation directory:
 SIMI_DIR = ./output_files
 
-VERILOG_INCLUDES =				\
-	$(RTL_PATH)/PipeReader_V.v		\
-	$(RTL_PATH)/PipeWriter_V.v		\
-	$(SIMI_DIR)/mkFPGADebugInterface.v
-
-TOP_MODULE = top
-
-PYTHON_TESTER = tstdebug.py --sim
+VERILOG_INCLUDES = $(SIMI_DIR)/mkFPGADebugInterface.v
 
 GENERIC_SIM_DIR = ./
 IVERILOG_WRAPPER = wrapper-iverilog.v
@@ -64,7 +67,7 @@ test: simi
 	@mkfifo bytepipe-host2hw
 	@mkfifo bytepipe-hw2host
 	$(IVERILOG_SIM) > $(SIMI_DIR)/iverilog.log &
-	python3 $(PYTHON_TESTER)
+	python3 $(PYTHON_TESTER) --sim
 	@rm bytepipe-host2hw bytepipe-hw2host
 
 #-----------------------------------------------------------------------------
@@ -92,7 +95,7 @@ $(IVERILOG_SIM): $(SIMI_DIR) $(SIMI_DIR)/$(TOP_MODULE).v $(GENERIC_SIM_DIR)/$(IV
 		$(VERILOG_INCLUDES)			\
 		 $(SIMI_DIR)/top.v
 
-$(SIMI_DIR)/$(TOP_MODULE).v: $(SIMI_DIR) $(RTL) $(BSV_LIBS)
+$(SIMI_DIR)/$(TOP_MODULE).v: $(SIMI_DIR) $(TOP_RTL) $(BSV_LIBS)
 	bsc $(BSC_SIM_FLAGS) 				\
 		-vsim iverilog				\
 	    	-simdir $(SIMI_DIR)    			\
@@ -105,8 +108,28 @@ $(SIMI_DIR):
 
 #-----------------------------------------------------------------------------
 # clean up
+.PHONY: clean
 clean:
 	rm -rf $(SIMI_DIR)
 	rm -rf __pycache__
 	rm -f *.bo
 	make -C $(RTL_PATH) clean
+
+#-----------------------------------------------------------------------------
+# FPGA indirects
+.PHONY:
+fpga_build:
+	make -C $(DE10_PATH) fpga_image PYTHON_TESTER=$(PATH_DE10_TO_HERE)/$(PYTHON_TESTER) TOP_RTL=$(PATH_DE10_TO_HERE)/$(TOP_RTL)
+
+.PHONY: program_fpga
+program_fpga:
+	make -C $(DE10_PATH) program_fpga
+
+.PHONY: test_fpga
+fpga_test:
+	python3 $(PYTHON_TESTER) --fpga
+
+.PHONY: fpga_clean
+fpga_clean:
+	make -C $(DE10_PATH) clean
+
