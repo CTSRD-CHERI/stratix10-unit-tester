@@ -30,9 +30,10 @@
 # ----------------------------------------------------------------------------
 # Simple test of FPGADebugInterface
 
+import sys
+sys.path.append(r'../../py')
 import fpga_debug_interface
 import argparse
-
 
 class simple_test:
     def __init__(self, simulation_mode):
