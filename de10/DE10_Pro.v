@@ -1,6 +1,7 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 //
+// Copyright (c) 2021 Simon W. Moore
 // Copyright (c) 2019 A. Theodore Markettos
 // All rights reserved.
 //
@@ -8,6 +9,13 @@
 // Cambridge Computer Laboratory (Department of Computer Science and
 // Technology), and ARM Research under DARPA contract HR0011-18-C-0016
 // ("ECATS"), as part of the DARPA SSITH research programme.
+// AND
+// This software was developed at the University of Cambridge Computer
+// Laboratory (Department of Computer Science and Technology) based
+// upon work supported by the DoD Information Analysis Center Program
+// Management Office (DoD IAC PMO), sponsored by the Defense
+// Technical Information Center (DTIC) under Contract
+// No. FA807518D0004.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -285,30 +293,36 @@ module DE10_Pro
    wire    clk_100;
    assign  clk_100 = CLK_100_B3I;
 
-   // Intel reset release IP
-   wire    ninit_done;
+   // Intel reset release IP to guarantee the FPGA is fully programmed
+   // before starting our design
+   wire    init_done_n;
    reset_release reset_release
      (
-      .ninit_done(ninit_done)
+      .ninit_done(init_done_n)
       );
 
    reg    reset_n_100;
    reg    reset_n_metastable_100;
-//   assign	reset_n = CPU_RESET_n && ninit_done;
-   assign  reset_n = !ninit_done;
+   //   assign	reset_n = CPU_RESET_n && init_done_n;
+   assign  reset_n = !init_done_n;
 
+   // Ensure that the reset is synchronised with the clock we're going
+   // to use
    always @(posedge clk_100)
      begin
 	reset_n_metastable_100 <= reset_n;
 	reset_n_100 <= reset_n_metastable_100;
      end
    
-   // instantiate the design under test (DUT)
+   // Instantiate the design under test (DUT)
    top dut
      (
       .CLK(clk_100),
       .RST_N(reset_n_100)
       );
+
+   // Instantiate fan controller logic so that the fan doesn't run
+   // full blast all the time
 
    wire [13:0] 	 HEX_DATA0;
    wire [13:0] 	 HEX_DATA1;
@@ -324,7 +338,6 @@ module DE10_Pro
    always @(posedge clk_100)
      ctr <= ctr + 26'd1;
 
-   //assign  Speed_Switch = (SW[0]==0)?13'd2000:13'd5000;
    assign  Speed_Switch = (SW[0]==BUTTON[0])?13'd2000:13'd5000;
 
    Fan_Control u0
