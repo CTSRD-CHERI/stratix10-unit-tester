@@ -32,9 +32,7 @@ SIM_NAME = namedpipe
 RTL_PATH = ../../bsv
 TOP_RTL = tst$(SIM_NAME).bsv
 RTL = $(TOP_RTL)
-VERILOG_INCLUDES =				\
-	$(RTL_PATH)/PipeReader_V.v		\
-	$(RTL_PATH)/PipeWriter_V.v
+VERILOG_INCLUDES =
 
 TOP_MODULE = top
 

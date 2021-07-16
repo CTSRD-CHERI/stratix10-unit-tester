@@ -31,9 +31,9 @@
  * Simple loop-back test of a named pipe
  */
 
-import GetPut    :: *;
-import FIFO      :: *;
-import NamedPipe :: *;
+import GetPut        :: *;
+import FIFO          :: *;
+import NamedPipePure :: *;
 
 module top(Empty);
   
