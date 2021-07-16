@@ -20,7 +20,8 @@
 # @BERI_LICENSE_HEADER_END@
 # 
 # ----------------------------------------------------------------------------
-# Build BSV test (TODO: and FPGA image)
+# Build FPGA image and test
+# TODO: generate reset_release IP
 
 SIM_NAME = FPGADebugInterface
 RTL_PATH = ../bsv
@@ -55,19 +56,16 @@ VERILOG_SRC = DE10_Pro.v			\
 .PHONY: help
 help:
 	@echo "Build steps"
-	@echo "0. Compile Bluespec design under test (DUT): compile_dut"
-	@echo "1. Generate the FPGA image (also does step 0): make clean;make fpga_image"
-	@echo "2. Program FPGA: make program_fpga"
-	@echo "3. Run test: make test"
+	@echo "0. Clean up: make clean"
+	@echo "1. Compile Bluespec design under test (DUT): compile_dut"
+	@echo "2. Generate the FPGA image (also does step 1): make fpga_image"
+	@echo "3. Program FPGA: make program_fpga"
+	@echo "4. Run test: make test"
 	@echo "Alternatively, do all of the above in one go (without make clean): make all"
 
 .PHONY: all
 all: compile_dut fpga_image program_fpga test
 
-.phony: fpga_image
-fpga_image: output_files/DE10_Pro.sof
-output_files/DE10_Pro.sof: $(DUT_DIR)/$(TOP_MODULE).v $(VERILOG_SRC)
-	quartus_sh --flow compile DE10_Pro.qpf
 
 #-----------------------------------------------------------------------------
 # compile the Bluespec design under test (DUT)
@@ -81,6 +79,18 @@ $(DUT_DIR)/$(TOP_MODULE).v: $(DUT_DIR) $(TOP_RTL) $(BSV_LIBS)
 
 $(DUT_DIR):
 	mkdir -p $(DUT_DIR)
+
+#-----------------------------------------------------------------------------
+# build the FPGA image
+#  - also generates the reset release IP
+.phony: fpga_image
+fpga_image: output_files/DE10_Pro.sof
+
+output_files/DE10_Pro.sof: reset_release/reset_release_inst.v $(DUT_DIR)/$(TOP_MODULE).v $(VERILOG_SRC)
+	quartus_sh --flow compile DE10_Pro.qpf
+
+reset_release/reset_release_inst.v:
+	quartus_ipgenerate DE10_Pro.qpf --generate_ip_file --ip_file=reset_release.ip --synthesis=verilog
 
 #-----------------------------------------------------------------------------
 # program the FPGA
@@ -102,5 +112,6 @@ test:
 # clean up
 clean:
 	rm -rf $(DUT_DIR)
-	rm -rf output_files tmp-clearbox qdb
+	rm -rf output_files tmp-clearbox qdb reset_release synth_dumps
+	rm -f reset_release.qpf reset_release.qsf
 	make -C $(RTL_PATH) clean
