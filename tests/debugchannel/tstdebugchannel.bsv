@@ -2,6 +2,12 @@
  * Copyright (c) 2021 Simon W. Moore
  * All rights reserved.
  *
+ * This software was developed at the University of Cambridge Computer
+ * Laboratory (Department of Computer Science and Technology) based
+ * upon work supported by the DoD Information Analysis Center Program
+ * Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.
+ *
  * @BERI_LICENSE_HEADER_START@
  *
  * Licensed to BERI Open Systems C.I.C. (BERI) under one or more contributor
