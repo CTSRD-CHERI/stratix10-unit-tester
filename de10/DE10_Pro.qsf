@@ -1577,12 +1577,13 @@ set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to HPS_JTAG_TDI -entity 
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to HPS_CARD_PRSNT_n -entity DE10_Pro
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to HPS_EMAC0_MDIO -entity DE10_Pro
 set_instance_assignment -name AUTO_OPEN_DRAIN_PINS ON -to HPS_EMAC0_MDIO -entity DE10_Pro
+set_global_assignment -name STRATIXV_CONFIGURATION_SCHEME "AVST X8"
 set_global_assignment -name USE_CONF_DONE SDM_IO16
-set_global_assignment -name STRATIXV_CONFIGURATION_SCHEME "ACTIVE SERIAL X4"
+set_global_assignment -name DEVICE_INITIALIZATION_CLOCK OSC_CLK_1_125MHZ
 set_global_assignment -name INI_VARS "ASM_ENABLE_ADVANCED_DEVICES=ON; hps_dump_handoff_data=on"
-set_global_assignment -name USE_HPS_COLD_RESET SDM_IO15
-set_global_assignment -name HPS_INITIALIZATION "HPS FIRST"
-set_global_assignment -name HPS_DAP_SPLIT_MODE "SDM PINS"
+#SWM removed: set_global_assignment -name USE_HPS_COLD_RESET SDM_IO15
+#SWM removed: set_global_assignment -name HPS_INITIALIZATION "HPS FIRST"
+#SWM removed: set_global_assignment -name HPS_DAP_SPLIT_MODE "SDM PINS"
 set_global_assignment -name USE_PWRMGT_SCL SDM_IO0
 set_global_assignment -name USE_PWRMGT_SDA SDM_IO12
 set_global_assignment -name VID_OPERATION_MODE "PMBUS MASTER"
