@@ -41,6 +41,7 @@ module top(Empty);
   Get#(Bit#(8)) rxpipe <- mkPipeReader();
   Put#(Bit#(8)) txpipe <- mkPipeWriter();
   Reg#(Bool)    finish <- mkReg(False);
+  Reg#(UInt#(16))  dly <- mkReg(1);
   
   rule do_rx;
     Bit#(8) d <- rxpipe.get();
@@ -53,11 +54,15 @@ module top(Empty);
     let reply = fifo.first ^ 8'h55; // invert every other bit in reply
     txpipe.put(reply);
     $display("\t\t\tTX = 0x%02x",reply);
-    if(fifo.first==0)
+    if(fifo.first==1)
       finish <= True;
   endrule
 
-  rule the_end(finish);
+   // hack to ensure that the process doesn't end before sending the last byte
+  rule dly_the_end(dly!=0);
+    dly <= dly+1;
+  endrule
+  rule the_end(finish && (dly==0));
     $finish(0);
   endrule
   
