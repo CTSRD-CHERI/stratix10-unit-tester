@@ -25,7 +25,8 @@
  * specific language governing permissions and limitations under the License.
  *
  * @BERI_LICENSE_HEADER_END@
- * /
+ */
+
 module PipeReader_V
   (
    input 	CLK,
