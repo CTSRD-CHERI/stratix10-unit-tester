@@ -1,0 +1,1 @@
+set_global_assignment -name IP_FILE chipid.ip
