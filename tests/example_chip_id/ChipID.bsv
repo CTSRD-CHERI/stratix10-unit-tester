@@ -51,7 +51,7 @@ module mkChipID(Get#(Bit#(64)));
   FIFOF#(Bit#(64))    idfifo <- mkFIFOF1;
   Reset               invRst <- invertCurrentReset();
   Stratix10ChipID      getid <- mkStratix10ChipID(reset_by invRst);
-  Reg#(Bit#(3))  start_timer <- mkReg(0);
+  Reg#(Bit#(4))  start_timer <- mkReg(0);
   
   /* 
      Note: start triggers readid and the Chip ID docs say:
@@ -63,18 +63,19 @@ module mkChipID(Get#(Bit#(64)));
        starts reading the value of the chip ID."
      start_timer achieves this (TODO: but should it wait for data_valid?)
    */
-  rule trigger(idfifo.notFull && (start_timer[2]==0));
+  rule trigger (idfifo.notFull && (msb(start_timer)==0));
      getid.start();
      start_timer <= start_timer+1;
   endrule
 
-  rule timer(start_timer[2]==1);
-     start_timer <= start_timer+1;
-  endrule
+//  rule timer (start_timer[3]==1);
+//     start_timer <= start_timer+1;
+//  endrule
      
-  rule store;
+  rule store (msb(start_timer)==1);
     Bit#(64) id = getid.chip_id();
     idfifo.enq(id);
+    start_timer <= 0;
   endrule
   
   return toGet(idfifo);
