@@ -47,7 +47,7 @@ if __name__ == "__main__":
         parser.error('Select --fpga or --sim')
     if(args.fpga):
         dbg = fpga_debug_interface.debug_interface(False)  # True=simulate, False=on FPGA
-        print("Reading ChipID: ", dbg.read(0))
+        print("Reading ChipID: 0x%016x" % (dbg.read(0)))
     if(args.sim):
         print("ERROR: Simulation is not an option for this test")
         exit(-1)
