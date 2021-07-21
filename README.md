@@ -78,7 +78,11 @@ The directory structure:
     * Use `make all` to build, download and run
     * Use `make help` for further information
 
+---
+## Dependencies
 
+* Tested on Quartus Prime Pro 19.2
+* The Python test drivers need the `intel_jtag_uart` package (`pip3 install intel_jtag_uart`).  See [py/requirements.txt](py/requirements.txt).
 
 ---
 ## Building your own tests
