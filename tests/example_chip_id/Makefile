@@ -35,6 +35,7 @@ DE10_PATH = ../../de10
 PATH_DE10_TO_HERE = ../tests/example_chip_id
 TOP_RTL = tst$(TEST_NAME).bsv
 TOP_MODULE = top
+INTEL_IP = chipid.ip
 PYTHON_TESTER = read_chipid.py
 
 #-----------------------------------------------------------------------------
@@ -68,7 +69,7 @@ clean: fpga_clean
 # Build FPGA image
 .PHONY:
 fpga_build:
-	cp dutip.qsf $(DE10_PATH)
+	cp dutip.qsf $(INTEL_IP) $(DE10_PATH)/
 	make -C $(DE10_PATH) fpga_image 				\
 		PYTHON_TESTER=$(PATH_DE10_TO_HERE)/$(PYTHON_TESTER) 	\
 		TOP_RTL=$(PATH_DE10_TO_HERE)/$(TOP_RTL)			\
