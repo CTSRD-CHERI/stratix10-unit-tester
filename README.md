@@ -73,4 +73,7 @@ The directory structure:
     * Use `make clean;make fpga_clean;make fpga_build` to build the FPGA image incorporating tstFPGADebugInterface.bsv
     * Use `make program_fpga` to program the FPGA (the FPGA JTAG chain file may need updating to your setup)
     * Use `make fpga_test` to run they Python test script
-  * [example_chip_id/](tests/fpgadebuginterface/example_chip_id) 
+  * [example_chip_id/](tests/example_chip_id) 
+    * Example that demonstrates instantiating some Intel IP and testing it, in this instance reading the Chip ID built into the Stratix 10 FPGA
+    * Use `make all` to build, download and run
+    * Use `make help` for further information
