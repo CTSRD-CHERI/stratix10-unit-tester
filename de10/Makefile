@@ -98,11 +98,9 @@ generate_ip:
 # program the FPGA
 .PHONY: program_fpga
 program_fpga:
-	quartus_pgm DE10_Pro.cdf
-
-.PHONY: clean_fpga_download_hack
-clean_fpga_download_hack:
-	quartus_pgm ~/Projects/de10-soak-test-copy/de10-pro/output_files/DE10_Pro.cdf
+	@echo "WARNING: program_fpga currently assumes that the device you wish to program is number 1"
+	@echo "         Use jtagconfig to identify which device you wish to program"
+	quartus_pgm --mode=jtag --operation="p;output_files/DE10_Pro.sof@1"
 
 #-----------------------------------------------------------------------------
 # run a test
