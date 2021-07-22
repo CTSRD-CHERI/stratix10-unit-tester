@@ -77,6 +77,7 @@ if __name__ == "__main__":
 
     programming_cmd_str = "p;{file}@{jtag_chain_id}".format(file=sof_file, jtag_chain_id=chain_id)
 
+    print(f"quartus_pgm -m jtag -o '{programming_cmd_str}'")
     chain_process = sp.run(["quartus_pgm",
                             "-m", "jtag",
                             "-o", programming_cmd_str],
