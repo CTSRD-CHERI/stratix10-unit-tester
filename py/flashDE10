@@ -10,7 +10,6 @@ This tool is made available under a BSD licence.
 """
 
 import subprocess as sp
-import argparse
 import sys, os
 
 USETEXT = """\
