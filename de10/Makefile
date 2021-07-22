@@ -22,13 +22,15 @@
 # ----------------------------------------------------------------------------
 # Build FPGA image and run test
 
+# The following should be defined in the Makefile that calls this one:
 #PYTHON_TESTER = ../tests/fpgadebuginterface/tstdebug.py
 #TOP_RTL = tstFPGADebugInterface.bsv
 #VERILOG_INCLUDES =				\
 #	$(DUT_DIR)/mkFPGADebugInterface.v
 #TEST_PATH = ../tests/fpgadebuginterface
+# RTL_PATH = 
 
-RTL_PATH = ../bsv
+RTL_PATH_FPGA_DEBUG = ../bsv
 # Directory for generated Verilog version of the DUT (design under test)
 DUT_DIR = ./dut_generated
 
@@ -42,7 +44,7 @@ IVERILOG_SIM  = $(DUT_DIR)/sim_$(TOP_MODULE)
 
 BLUESPEC_INSTALL_ROOT = $(BLUESPEC)
 BLUESPEC_VERILOG = $(BLUESPEC_INSTALL_ROOT)/lib/Verilog
-BSV_LIBS = $(RTL_PATH)/*.bsv
+BSV_LIBS = $(RTL_PATH_FPGA_DEBUG)/*.bsv
 BSC_FLAGS = -opt-undetermined-vals		\
 	    -unspecified-to X			\
 	    -aggressive-conditions		\
@@ -74,6 +76,7 @@ compile_dut: $(DUT_DIR)/$(TOP_MODULE).v
 $(DUT_DIR)/$(TOP_MODULE).v: $(DUT_DIR) $(TOP_RTL) $(BSV_LIBS)
 	bsc $(BSC_FLAGS) 				\
 	    	-vdir $(DUT_DIR)			\
+		-p +:$(RTL_PATH_FPGA_DEBUG)             \
 		-p +:$(RTL_PATH)                        \
 		-p +:$(TEST_PATH)                       \
 	    	-g $(TOP_MODULE) -u $(TOP_RTL)
@@ -84,10 +87,10 @@ $(DUT_DIR):
 #-----------------------------------------------------------------------------
 # build the FPGA image
 #  - also generates IP required by DE10_Pro.qsf
-.phony: generate_ip fpga_image
+.PHONY: fpga_image
 fpga_image: output_files/DE10_Pro.sof
 
-output_files/DE10_Pro.sof: generate_ip $(DUT_DIR)/$(TOP_MODULE).v $(VERILOG_SRC)
+output_files/DE10_Pro.sof: $(DUT_DIR)/$(TOP_MODULE).v $(VERILOG_SRC) generate_ip
 	quartus_sh --flow compile DE10_Pro.qpf
 
 .PHONY: generate_ip
