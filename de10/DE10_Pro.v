@@ -5,17 +5,17 @@
 // Copyright (c) 2019 A. Theodore Markettos
 // All rights reserved.
 //
-// This software was developed by SRI International, the University of
-// Cambridge Computer Laboratory (Department of Computer Science and
-// Technology), and ARM Research under DARPA contract HR0011-18-C-0016
-// ("ECATS"), as part of the DARPA SSITH research programme.
-// AND
 // This software was developed at the University of Cambridge Computer
 // Laboratory (Department of Computer Science and Technology) based
 // upon work supported by the DoD Information Analysis Center Program
 // Management Office (DoD IAC PMO), sponsored by the Defense
 // Technical Information Center (DTIC) under Contract
 // No. FA807518D0004.
+// AND
+// This software was developed by SRI International, the University of
+// Cambridge Computer Laboratory (Department of Computer Science and
+// Technology), and ARM Research under DARPA contract HR0011-18-C-0016
+// ("ECATS"), as part of the DARPA SSITH research programme.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions

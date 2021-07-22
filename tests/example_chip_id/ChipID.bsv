@@ -27,8 +27,9 @@
 
 package ChipID;
 
-import GetPut :: *;
-import FIFOF  :: *;
+import GetPut  :: *;
+import FIFOF   :: *;
+import Clocks  :: *;
 
 interface Stratix10ChipID;
   method Action   start;
@@ -47,15 +48,31 @@ import "BVI" chipid =
   endmodule
 
 module mkChipID(Get#(Bit#(64)));
-  FIFOF#(Bit#(64)) idfifo <- mkFIFOF1;
-  Stratix10ChipID   getid <- mkStratix10ChipID;
+  FIFOF#(Bit#(64))    idfifo <- mkFIFOF1;
+  Reset               invRst <- invertCurrentReset();
+  Stratix10ChipID      getid <- mkStratix10ChipID(reset_by invRst);
+  Reg#(Bit#(4))  start_timer <- mkReg(0);
   
-  rule trigger(idfifo.notFull);
-    getid.start();
+  /* 
+     Note: 'start' triggers 'readid' and the Chip ID docs say:
+       "The readid signal is used to read the ID value from the
+       device. Every time the signal change value from 1 to 0, the IP
+       core triggers the read ID operation. You must drive the signal
+       to 0 when unused. To start the read ID operation, drive the signal
+       high for at least 3 clock cycles, then pull it low. The IP core
+       starts reading the value of the chip ID."
+     start_timer achieves this.
+   */
+
+  rule trigger (idfifo.notFull && (msb(start_timer)==0));
+     getid.start();
+     start_timer <= start_timer+1;
   endrule
-  rule store;
+
+  rule store (msb(start_timer)==1);
     Bit#(64) id = getid.chip_id();
     idfifo.enq(id);
+    start_timer <= 0;
   endrule
   
   return toGet(idfifo);

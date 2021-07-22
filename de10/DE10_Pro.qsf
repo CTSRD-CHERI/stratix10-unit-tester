@@ -1605,7 +1605,7 @@ set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
 
 set_global_assignment -name TOP_LEVEL_ENTITY DE10_Pro
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
-set_global_assignment -name ENABLE_SIGNALTAP OFF
+set_global_assignment -name ENABLE_SIGNALTAP ON
 set_global_assignment -name LAST_QUARTUS_VERSION "19.2.0 Pro Edition"
 set_global_assignment -name USE_CONFIGURATION_DEVICE ON
 set_global_assignment -name GENERATE_PR_RBF_FILE ON
@@ -1628,3 +1628,4 @@ set_global_assignment -name VERILOG_FILE Fan/I2C_Bus_Controller.v
 set_global_assignment -name VERILOG_FILE Fan/I2C_Config.v
 set_global_assignment -name VERILOG_FILE Fan/SEG7_LUT.v
 set_global_assignment -name IP_FILE reset_release.ip
+source dutip.qsf

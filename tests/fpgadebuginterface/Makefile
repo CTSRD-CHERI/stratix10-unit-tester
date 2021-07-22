@@ -35,6 +35,7 @@ PATH_DE10_TO_HERE = ../tests/fpgadebuginterface
 TOP_RTL = tst$(SIM_NAME).bsv
 TOP_MODULE = top
 PYTHON_TESTER = tstdebug.py
+DUTIP = /dev/null
 
 # iverilog simulation directory:
 SIMI_DIR = ./output_files
@@ -119,6 +120,7 @@ clean:
 # FPGA indirects
 .PHONY:
 fpga_build:
+	cp $(DUTIP) $(DE10_PATH)/dutip.ip
 	make -C $(DE10_PATH) fpga_image PYTHON_TESTER=$(PATH_DE10_TO_HERE)/$(PYTHON_TESTER) TOP_RTL=$(PATH_DE10_TO_HERE)/$(TOP_RTL)
 
 .PHONY: program_fpga

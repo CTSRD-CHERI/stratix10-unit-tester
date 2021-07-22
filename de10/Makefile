@@ -20,22 +20,22 @@
 # @BERI_LICENSE_HEADER_END@
 #
 # ----------------------------------------------------------------------------
-# Build FPGA image and test
-# TODO: generate reset_release IP
+# Build FPGA image and run test
 
-SIM_NAME = FPGADebugInterface
-RTL_PATH = ../bsv
-PY_PATH = ../py
-TOP_RTL = ../tests/fpgadebuginterface/tst$(SIM_NAME).bsv
+# The following should be defined in the Makefile that calls this one:
+#PYTHON_TESTER = ../tests/fpgadebuginterface/tstdebug.py
+#TOP_RTL = tstFPGADebugInterface.bsv
+#VERILOG_INCLUDES =				\
+#	$(DUT_DIR)/mkFPGADebugInterface.v
+#TEST_PATH = ../tests/fpgadebuginterface
+# RTL_PATH =
+
+RTL_PATH_FPGA_DEBUG = ../bsv
 # Directory for generated Verilog version of the DUT (design under test)
 DUT_DIR = ./dut_generated
 
-VERILOG_INCLUDES =				\
-	$(DUT_DIR)/mkFPGADebugInterface.v
-
+# Name of top-level module from BSV DUT (assumption in DE10_Pro.v)
 TOP_MODULE = top
-
-PYTHON_TESTER = ../tests/fpgadebuginterface/tstdebug.py
 
 GENERIC_SIM_DIR = ./
 IVERILOG_WRAPPER = wrapper-iverilog.v
@@ -44,7 +44,7 @@ IVERILOG_SIM  = $(DUT_DIR)/sim_$(TOP_MODULE)
 
 BLUESPEC_INSTALL_ROOT = $(BLUESPEC)
 BLUESPEC_VERILOG = $(BLUESPEC_INSTALL_ROOT)/lib/Verilog
-BSV_LIBS = $(RTL_PATH)/*.bsv
+BSV_LIBS = $(RTL_PATH_FPGA_DEBUG)/*.bsv
 BSC_FLAGS = -opt-undetermined-vals		\
 	    -unspecified-to X			\
 	    -aggressive-conditions		\
@@ -56,7 +56,8 @@ VERILOG_SRC = DE10_Pro.v			\
 
 .PHONY: help
 help:
-	@echo "Build steps"
+	@echo "This Makefile is typically started by a ../tests/*/Makefile"
+	@echo "Build steps:"
 	@echo "0. Clean up: make clean"
 	@echo "1. Compile Bluespec design under test (DUT): compile_dut"
 	@echo "2. Generate the FPGA image (also does step 1): make fpga_image"
@@ -75,7 +76,9 @@ compile_dut: $(DUT_DIR)/$(TOP_MODULE).v
 $(DUT_DIR)/$(TOP_MODULE).v: $(DUT_DIR) $(TOP_RTL) $(BSV_LIBS)
 	bsc $(BSC_FLAGS) 				\
 	    	-vdir $(DUT_DIR)			\
+		-p +:$(RTL_PATH_FPGA_DEBUG)             \
 		-p +:$(RTL_PATH)                        \
+		-p +:$(TEST_PATH)                       \
 	    	-g $(TOP_MODULE) -u $(TOP_RTL)
 
 $(DUT_DIR):
@@ -83,21 +86,22 @@ $(DUT_DIR):
 
 #-----------------------------------------------------------------------------
 # build the FPGA image
-#  - also generates the reset release IP
-.phony: fpga_image
+#  - also generates IP required by DE10_Pro.qsf
+.PHONY: fpga_image
 fpga_image: output_files/DE10_Pro.sof
 
-output_files/DE10_Pro.sof: reset_release/reset_release_inst.v $(DUT_DIR)/$(TOP_MODULE).v $(VERILOG_SRC)
+output_files/DE10_Pro.sof: $(DUT_DIR)/$(TOP_MODULE).v $(VERILOG_SRC) generate_ip
 	quartus_sh --flow compile DE10_Pro.qpf
 
-reset_release/reset_release_inst.v:
-	quartus_ipgenerate DE10_Pro.qpf --generate_ip_file --ip_file=reset_release.ip --synthesis=verilog
+.PHONY: generate_ip
+generate_ip:
+	quartus_ipgenerate --generate_project_ip_files -synthesis=verilog DE10_Pro.qpf --clear_ip_generation_dirs
 
 #-----------------------------------------------------------------------------
 # program the FPGA
 .PHONY: program_fpga
 program_fpga:
-	$(PY_PATH)/flashDE10 output_files/DE10_Pro.sof
+	../py/flashDE10 output_files/DE10_Pro.sof
 
 .PHONY: clean_fpga_download_hack
 clean_fpga_download_hack:
@@ -113,6 +117,6 @@ test:
 # clean up
 clean:
 	rm -rf $(DUT_DIR)
-	rm -rf output_files tmp-clearbox qdb reset_release synth_dumps
-	rm -f reset_release.qpf reset_release.qsf
+	rm -rf output_files tmp-clearbox qdb synth_dumps
+	quartus_ipgenerate --clear_ip_generation_dirs DE10_Pro.qpf
 	make -C $(RTL_PATH) clean
