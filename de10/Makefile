@@ -18,7 +18,7 @@
 # specific language governing permissions and limitations under the License.
 #
 # @BERI_LICENSE_HEADER_END@
-# 
+#
 # ----------------------------------------------------------------------------
 # Build FPGA image and run test
 
@@ -28,7 +28,7 @@
 #VERILOG_INCLUDES =				\
 #	$(DUT_DIR)/mkFPGADebugInterface.v
 #TEST_PATH = ../tests/fpgadebuginterface
-# RTL_PATH = 
+# RTL_PATH =
 
 RTL_PATH_FPGA_DEBUG = ../bsv
 # Directory for generated Verilog version of the DUT (design under test)
@@ -101,14 +101,16 @@ generate_ip:
 # program the FPGA
 .PHONY: program_fpga
 program_fpga:
-	@echo "WARNING: program_fpga currently assumes that the device you wish to program is number 1"
-	@echo "         Use jtagconfig to identify which device you wish to program"
-	quartus_pgm --mode=jtag --operation="p;output_files/DE10_Pro.sof@1"
+	../py/flashDE10 output_files/DE10_Pro.sof
+
+.PHONY: clean_fpga_download_hack
+clean_fpga_download_hack:
+	quartus_pgm ~/Projects/de10-soak-test-copy/de10-pro/output_files/DE10_Pro.cdf
 
 #-----------------------------------------------------------------------------
 # run a test
 .PHONY: test
-test: 
+test:
 	python3 $(PYTHON_TESTER) --fpga
 
 #-----------------------------------------------------------------------------

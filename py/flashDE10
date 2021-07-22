@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""
+A shim tool to ease programming the Terasic DE10 Pro dev kit.
+This board has a varying JTAG chain depending on the position of the fragile
+DIP switches on the rear of the card; either a single device for the FPGA or
+2; HPS and then FPGA. This script wraps quartus_pgm to "do the right thing".
+
+CC Coral Westoby 2021 University of Cambridge
+This tool is made available under a BSD licence.
+"""
+
+import subprocess as sp
+import argparse
+import sys, os
+
+USETEXT = """\
+Usage:
+    flashDE10 path/to/bit.sof : flashes the 1SX280 device on the first DE10 jtag adaptor.
+    flashDE10 deviceid path/to/bit.sof : flashes the first deviceid with the given sof.
+"""
+
+HELPTEXT = """
+Could not infer the correct programming command. Please run quartus_pgm manually.
+quartus_pgm -m jtag -o \"p;<PATH TO .SOF>@<CHAIN ID>\"
+"""
+
+def find_jtag_id(jtagconfig_str, target):
+    chain_l = jtagconfig_str.split('\n')
+    idx_of_de10 = [i for i, line in enumerate(chain_l) if "DE10-Pro" in line]
+
+    if len(idx_of_de10) == 0:
+        raise RuntimeError(f"could not find a DE10 Pro connected to this machine. jtagconfig returned \n{jtagconfig_str}")
+    if len(idx_of_de10) > 1:
+        raise RuntimeError(f"Found multiple DE10 Pros connected to this machine. jtagconfig returned \n{jtagconfig_str}\n{HELPTEXT}")
+
+    idx_of_de10 = idx_of_de10[0]
+    for i, line in enumerate(chain_l[idx_of_de10:]):
+        if target in line:
+            chain_idx = i
+            break
+    else:
+        raise RuntimeError(f"Could not find a {target} in the jtag chain. jtagconfig returned \n{jtagconfig_str}")
+
+    return chain_idx
+
+def tests():
+    fpga_only = b'1) DE10-Pro [1-1.2.2]\n  C322D0DD   1SX280HH1(.|S3)/1SX280HH2/..\n\n'
+    fpga_and_hps = b'1) DE10-Pro [1-1.2.2]\n  6BA00477   S10HPS\n  C322D0DD   1SX280HH1(.|S3)/1SX280HH2/..\n\n'
+
+    try:
+        find_jtag_id(b"")
+        assert(False)
+    except RuntimeError:
+        print(".")
+
+    assert(find_jtag_id(fpga_only) == 1)
+    print(".")
+    assert(find_jtag_id(fpga_and_hps) == 2)
+    print(".")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1 or len(sys.argv) > 3:
+        print(USETEXT)
+        exit()
+    elif len(sys.argv) == 2:
+        sof_file = sys.argv[1]
+        FPGA="1SX280"
+    else:
+        sof_file = sys.argv[2]
+        FPGA=sys.argv[1]
+
+    if not os.access(sof_file, os.R_OK):
+        raise RuntimeError(f"Provided programming file {sof_file} was not able to be read.")
+
+    chain_process = sp.run(["jtagconfig"], stdout=sp.PIPE, stderr=sys.stderr, timeout=5, check=True)
+    chain_id = find_jtag_id(chain_process.stdout.decode(), target="1SX280")
+
+    programming_cmd_str = "p;{file}@{jtag_chain_id}".format(file=sof_file, jtag_chain_id=chain_id)
+
+    chain_process = sp.run(["quartus_pgm",
+                            "-m", "jtag",
+                            "-o", programming_cmd_str],
+                           stdout=sys.stdout, stderr=sys.stderr, check=True)
