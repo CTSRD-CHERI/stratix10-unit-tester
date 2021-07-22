@@ -18,13 +18,14 @@
 # specific language governing permissions and limitations under the License.
 #
 # @BERI_LICENSE_HEADER_END@
-# 
+#
 # ----------------------------------------------------------------------------
 # Build FPGA image and test
 # TODO: generate reset_release IP
 
 SIM_NAME = FPGADebugInterface
 RTL_PATH = ../bsv
+PY_PATH = ../py
 TOP_RTL = ../tests/fpgadebuginterface/tst$(SIM_NAME).bsv
 # Directory for generated Verilog version of the DUT (design under test)
 DUT_DIR = ./dut_generated
@@ -96,7 +97,7 @@ reset_release/reset_release_inst.v:
 # program the FPGA
 .PHONY: program_fpga
 program_fpga:
-	quartus_pgm DE10_Pro.cdf
+	$(PY_PATH)/flashDE10 output_files/DE10_Pro.sof
 
 .PHONY: clean_fpga_download_hack
 clean_fpga_download_hack:
@@ -105,8 +106,8 @@ clean_fpga_download_hack:
 #-----------------------------------------------------------------------------
 # run a test
 .PHONY: test
-test: 
-	python3 $(PYTHON_TESTER) --fpga
+test:
+	PYTHONPATH=${PY_PATH} python3 $(PYTHON_TESTER) --fpga
 
 #-----------------------------------------------------------------------------
 # clean up
