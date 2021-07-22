@@ -111,7 +111,7 @@ clean_fpga_download_hack:
 # run a test
 .PHONY: test
 test:
-	PYTHONPATH=${PY_PATH} python3 $(PYTHON_TESTER) --fpga
+	python3 $(PYTHON_TESTER) --fpga
 
 #-----------------------------------------------------------------------------
 # clean up
