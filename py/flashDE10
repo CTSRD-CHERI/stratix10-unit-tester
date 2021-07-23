@@ -74,7 +74,7 @@ if __name__ == "__main__":
         raise RuntimeError(f"Provided programming file {sof_file} was not able to be read.")
 
     chain_process = sp.run(["jtagconfig"], stdout=sp.PIPE, stderr=sys.stderr, timeout=5, check=True)
-    chain_id = find_jtag_id(chain_process.stdout.decode(), target="1SX280")
+    chain_id = find_jtag_id(chain_process.stdout.decode(), target=FPGA)
 
     programming_cmd_str = "p;{file}@{jtag_chain_id}".format(file=sof_file, jtag_chain_id=chain_id)
 
