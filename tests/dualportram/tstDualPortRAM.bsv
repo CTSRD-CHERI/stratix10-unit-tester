@@ -30,31 +30,73 @@ import GetPut             :: *;
 import ClientServer       :: *;
 import FPGADebugInterface :: *;
 import RegFile            :: *;
+import FIFOF              :: *;
+
+typedef struct {
+   Bit#(1) re;       // read enable
+   Bit#(1) we;       // write enable
+   Bit#(9) rd_addr;  // read address
+   Bit#(9) wr_addr;  // write address
+   Bit#(32) wr_data; // write data
+   } CmdT deriving (Bits, Eq);
 
 module top(Empty);
 
-  FPGADebugInterface comms <- mkFPGADebugInterface();
-  Reg#(Bit#(9))   addr_reg <- mkReg(0);
+  FPGADebugInterface        comms <- mkFPGADebugInterface();
   RegFile#(Bit#(9),Bit#(32)) m20k <- mkRegFileWCF(0,511); // M20K block is natively 512 x 40b but can also be used 512 x 32b
+  FIFOF#(CmdT)                  s <- mkSizedFIFOF(1024);
+  FIFOF#(Bit#(32))             rd <- mkSizedFIFOF(1024);
+  Reg#(Bool)      run_sequence[2] <- mkCReg(2, False);
   
   rule handle_requests;
     DebugRequest r <- comms.request.get();
     case (r.cmd)
       Cmd_write_word:
         if(r.idx == 0)
-	  m20k.upd(addr_reg, truncate(r.dat));
+	  begin
+	    Bit#(64) d = r.dat;
+      	    CmdT cmd = CmdT {
+               re      : d[51],
+	       we      : d[50],
+	       rd_addr : d[49:41],
+	       wr_addr : d[40:32],
+	       wr_data : d[31:0]};
+	    s.enq(cmd);
+	  end
         else if(r.idx == 1)
-	  addr_reg <= truncate(r.dat);
+	  run_sequence[0] <= True;
         else
 	  $display("ERROR: invalid index %1d on write", r.idx);
       Cmd_read_word:
         if(r.idx == 0)
-	  comms.response.put(zeroExtend(m20k.sub(addr_reg)));
+	  if(rd.notEmpty)
+	    begin
+	      comms.response.put(zeroExtend(rd.first));
+	      rd.deq;
+	    end
+          else
+	    comms.response.put(64'hdeaddead00000000);
+        else if(r.idx == 1)
+	  comms.response.put(zeroExtend({pack(run_sequence[0]),pack(s.notFull),pack(s.notEmpty),pack(rd.notFull),pack(rd.notEmpty)}));
         else
 	  $display("ERROR: invalid index %1d on read", r.idx);
       default:
         $display("ERROR: command %1d not handled", r.cmd);
     endcase
+  endrule
+
+  rule do_sequence(run_sequence[1]);
+    if(s.notEmpty)
+      begin
+	CmdT cmd = s.first;
+	s.deq;
+	if(cmd.we==1)
+	  m20k.upd(cmd.wr_addr, cmd.wr_data);
+        if(cmd.re==1)
+	  rd.enq(m20k.sub(cmd.rd_addr));
+      end
+    else
+      run_sequence[1] <= False;
   endrule
   
 endmodule

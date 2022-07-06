@@ -55,18 +55,36 @@ class simple_test:
     def write_report(self, idx, data):
         self.dbg.write(idx, data)
         print("reg[%1d] <= %2d" % (idx, data))
+
+    def write_cmd(self, re, we, rd_addr, wr_addr, wr_data):
+        cmd = ((re & 0x1)<<51) | ((we & 0x1)<<50) | ((rd_addr & 0x1ff)<<41) | ((wr_addr & 0x1ff)<<32) | (wr_data & 0xffffffff)
+        self.write_report(0,cmd)
+
+    def running(self):
+        return (self.dbg.read(1)>>4) & 0x1
     
     def run_test(self):
         self.dbg.clear()
-        print("Writing values to RAM")
-        for j in range(512):
-            self.write_report(1,j)    # address register write
-            self.write_report(0,j+13) # write data to address
-        print("Reading values from RAM")
-        for j in range(512):
-            a = j ^ 0x1aa
-            self.write_report(1,a)    # address register write
-            self.read_check(0,a+13)
+        print("Writing command sequence")
+        for j in range(16):  # seqence of writes
+            self.write_cmd(0,1,0,j,j+10000)
+        for j in range(16):  # sequence of reads
+            self.write_cmd(1,0,j,0,0)
+        for j in range(16):  # sequence of write and reads reads
+            self.write_cmd(1,1,j,j,j+20000)
+        for j in range(16):  # sequence of write and reads reads
+            self.write_cmd(1,1,(j+15) % 16,j,j+30000)
+        print("Run sequence")
+        self.write_report(1,1)
+        while(self.running()):
+            print("Waiting for test sequence to finish")
+        print("Reading values read")
+        for j in range(16):
+            print("mem[%2d] = %d" % (j,self.dbg.read(0)))
+        for j in range(16):
+            print("mem[%2d] = %d" % (j,self.dbg.read(0)))
+        for j in range(16):
+            print("mem[%2d] = %d" % ((j+15) % 16,self.dbg.read(0)))
         self.dbg.end_simulation()
     
 if __name__ == "__main__":
