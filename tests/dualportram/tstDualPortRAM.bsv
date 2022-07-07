@@ -29,7 +29,8 @@ import Vector             :: *;
 import GetPut             :: *;
 import ClientServer       :: *;
 import FPGADebugInterface :: *;
-import RegFile            :: *;
+//import RegFile            :: *;
+import BlockRAMv          :: *;
 import FIFOF              :: *;
 
 typedef struct {
@@ -43,7 +44,8 @@ typedef struct {
 module top(Empty);
 
   FPGADebugInterface        comms <- mkFPGADebugInterface();
-  RegFile#(Bit#(9),Bit#(32)) m20k <- mkRegFileWCF(0,511); // M20K block is natively 512 x 40b but can also be used 512 x 32b
+//  RegFile#(Bit#(9),Bit#(32)) m20k <- mkRegFileWCF(0,511); // M20K block is natively 512 x 40b but can also be used 512 x 32b
+  BlockRam#(Bit#(9),Bit#(32)) m20k <- mkBlockRAM_Verilog;
   FIFOF#(CmdT)                  s <- mkSizedFIFOF(1024);
   FIFOF#(Bit#(32))             rd <- mkSizedFIFOF(1024);
   Reg#(Bool)      run_sequence[2] <- mkCReg(2, False);
@@ -91,12 +93,17 @@ module top(Empty);
 	CmdT cmd = s.first;
 	s.deq;
 	if(cmd.we==1)
-	  m20k.upd(cmd.wr_addr, cmd.wr_data);
+	  m20k.write(cmd.wr_addr, cmd.wr_data);
+	  // m20k.upd(cmd.wr_addr, cmd.wr_data);
         if(cmd.re==1)
-	  rd.enq(m20k.sub(cmd.rd_addr));
+	  m20k.read(cmd.rd_addr);
+	  // rd.enq(m20k.sub(cmd.rd_addr));
       end
     else
       run_sequence[1] <= False;
   endrule
-  
+
+  rule store_reads(m20k.dataOutValid);
+    rd.enq(m20k.dataOut);
+  endrule  
 endmodule
