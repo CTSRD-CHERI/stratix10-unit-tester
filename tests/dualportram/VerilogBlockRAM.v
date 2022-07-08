@@ -19,7 +19,8 @@ module VerilogBlockRAM_OneCycle
 
    always @ (posedge CLK) begin
       if (WE)
-        mem[WR_ADDR] = DI;
+	mem[WR_ADDR] <= DI;
+        //mem[WR_ADDR] = DI;  // should trigger coherent read
       if (RE)
 	DO <= mem[RD_ADDR];
       else
