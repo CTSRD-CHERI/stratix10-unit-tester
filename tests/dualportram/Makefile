@@ -121,7 +121,7 @@ clean:
 .PHONY:
 fpga_build:
 	cp $(DUTIP) $(DE10_PATH)/dutip.ip
-	cp VerilogBlockRAM.v $(DE10_PATH)/dut_generated/VerilogBlockRAM_OneCycle.v 	# bit of a hack
+	cp VerilogBlockRAM.v $(DE10_PATH)/VerilogBlockRAM_OneCycle.v 	# bit of a hack to get the Verilog included
 	make -C $(DE10_PATH) fpga_image PYTHON_TESTER=$(PATH_DE10_TO_HERE)/$(PYTHON_TESTER) TOP_RTL=$(PATH_DE10_TO_HERE)/$(TOP_RTL) RTL_PATH=$(PATH_DE10_TO_HERE)
 #VERILOG_INCLUDES=$(PATH_DE10_TO_HERE/VerilogBlockRAM.v)
 

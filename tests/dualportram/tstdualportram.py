@@ -73,7 +73,8 @@ class simple_test:
         for j in range(16):  # sequence of write and reads reads
             self.write_cmd(1,1,j,j,j+20000)
         for j in range(16):  # sequence of write and reads reads
-            self.write_cmd(1,1,(j+15) % 16,j,j+30000)
+            self.write_cmd(1,1,j^1,j,j+30000)
+#            self.write_cmd(1,1,(j+15) % 16,j,j+30000)
         print("Run sequence")
         self.write_report(1,1)
         while(self.running()):
@@ -84,7 +85,8 @@ class simple_test:
         for j in range(16):
             print("mem[%2d] = %d" % (j,self.dbg.read(0)))
         for j in range(16):
-            print("mem[%2d] = %d" % ((j+15) % 16,self.dbg.read(0)))
+            print("mem[%2d] = %d" % (j^1,self.dbg.read(0)))
+#            print("mem[%2d] = %d" % ((j+15) % 16,self.dbg.read(0)))
         self.dbg.end_simulation()
     
 if __name__ == "__main__":
