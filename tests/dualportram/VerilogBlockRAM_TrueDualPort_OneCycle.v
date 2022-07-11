@@ -31,7 +31,7 @@ module VerilogBlockRAM_TrueDualPort_OneCycle
    (
     input [ADDR_WIDTH-1:0] 	ADDR_A, ADDR_B,
     input [DATA_WIDTH-1:0] 	DI_A, DI_B,
-    input 			WE_A, WE_B, RE_A, RE_B, EN_A, EN_B, CLK,
+    input 			WE_A, WE_B, EN_A, EN_B, CLK,
     output reg [DATA_WIDTH-1:0] DO_A, DO_B,
     output reg 			DO_VALID_A, DO_VALID_B
     );
@@ -43,15 +43,13 @@ module VerilogBlockRAM_TrueDualPort_OneCycle
       if (WE_A && EN_A)
 	mem[ADDR_A] = DI_A; // blocking assignment used by Intel template
       DO_A <= mem[ADDR_A];
-      DO_VALID_A <= RE_B && EN_A;
+      DO_VALID_A <= !WE_A && EN_A;
 
       if (WE_B && EN_B)
 	mem[ADDR_B] = DI_B; // blocking assignment used by Intel template
       DO_B <= mem[ADDR_B];
-      DO_VALID_B <= RE_B && EN_B;
-
-      //if(EN_A) $display("EN_A=True, WE_B=%1d, RE_B=%1d, ADDR_A=%4d", WE_A, RE_A, ADDR_A);
-      //if(EN_B) $display("EN_B=True, WE_B=%1d, RE_B=%1d, ADDR_B=%4d", WE_B, RE_B, ADDR_B);
+      DO_VALID_B <= !WE_B && EN_B;
    end
+
 endmodule // VerilogBlockRAM_OneCycle
 
