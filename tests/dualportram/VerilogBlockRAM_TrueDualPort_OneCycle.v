@@ -21,7 +21,10 @@
  * @BERI_LICENSE_HEADER_END@
  * 
  * ----------------------------------------------------------------------------
- * Synthesizable Verilog template for BRAM
+ * Synthesizable Verilog template for true dual-port block RAM
+ * Note that the Verilog is very carefully crafted so that the the module
+ * turns into block RAMs.  In particular, use of blocking assignment for
+ * the writes appears to be essential!
  */
 
 
@@ -36,20 +39,27 @@ module VerilogBlockRAM_TrueDualPort_OneCycle
     output reg 			DO_VALID_A, DO_VALID_B
     );
    
-   // (* ramstyle = "m20k" *)  - pragma that could be tried, but not used by Intel template
-   (* ramstyle = "m20k" *) reg [DATA_WIDTH-1:0] 	mem [2**ADDR_WIDTH-1:0];
+   (* ramstyle = "m20k" *) reg [DATA_WIDTH-1:0] 	ram [2**ADDR_WIDTH-1:0];
 
+   assign wea = WE_A && EN_A;
+   assign web = WE_B && EN_B;
+   
    always @ (posedge CLK) begin
-      if (WE_A && EN_A)
-	mem[ADDR_A] = DI_A; // blocking assignment used by Intel template
-      DO_A <= mem[ADDR_A];
-      DO_VALID_A <= !WE_A && EN_A;
-
-      if (WE_B && EN_B)
-	mem[ADDR_B] = DI_B; // blocking assignment used by Intel template
-      DO_B <= mem[ADDR_B];
-      DO_VALID_B <= !WE_B && EN_B;
+      if (wea)
+	 ram[ADDR_A] = DI_A;
+      DO_A <= ram[ADDR_A];
    end
 
+   always @ (posedge CLK) begin
+      if (web)
+	ram[ADDR_B] = DI_B;
+      DO_B <= ram[ADDR_B];
+   end
+
+   always @ (posedge CLK) begin
+      DO_VALID_A <= !WE_A && EN_A;
+      DO_VALID_B <= !WE_B && EN_B;
+   end
+   
 endmodule // VerilogBlockRAM_OneCycle
 
