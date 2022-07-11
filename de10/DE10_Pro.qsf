@@ -1620,6 +1620,8 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to LED[1] 
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to LED[0] -entity DE10_Pro
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to LED -entity DE10_Pro
 set_global_assignment -name SEARCH_PATH ./dut_generated
+set_global_assignment -name SYSTEMVERILOG_FILE ./dut_generated/AlteraBlockRam.sv
+
 set_global_assignment -name SDC_FILE jtag.sdc
 set_global_assignment -name VERILOG_FILE DE10_Pro.v
 set_global_assignment -name SDC_FILE DE10_Pro.sdc

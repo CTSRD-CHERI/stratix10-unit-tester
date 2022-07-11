@@ -45,15 +45,15 @@ IVERILOG_SIM  = $(DUT_DIR)/sim_$(TOP_MODULE)
 BLUESPEC_INSTALL_ROOT = $(BLUESPEC)
 BLUESPEC_VERILOG = $(BLUESPEC_INSTALL_ROOT)/lib/Verilog
 BSV_LIBS = $(RTL_PATH_FPGA_DEBUG)/*.bsv
-BSC_FLAGS = -opt-undetermined-vals		\
+BSC_FLAGS += -opt-undetermined-vals		\
 	    -unspecified-to X			\
 	    -aggressive-conditions		\
-	    -D BSV_NO_INITIAL_BLOCKS		\
+	    -D BSV_NO_INITIAL_BLOCKS	-D DeviceFamily='"Stratix 10"'	\
 	    -verilog
 
 VERILOG_SRC = DE10_Pro.v			\
 	      $(wildcard Fan/*.v)
-
+				
 .PHONY: help
 help:
 	@echo "This Makefile is typically started by a ../tests/*/Makefile"

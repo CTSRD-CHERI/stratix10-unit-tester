@@ -12,7 +12,7 @@ package BlockRAMv;
 // ==========
 
 // Basic dual-port block RAM with a read port and a write port
-interface BlockRam#(type addr, type data);
+interface BlockRamv#(type addr, type data);
   method Action read(addr a);
   method Action write(addr a, data d);
   method data dataOut;
@@ -25,7 +25,7 @@ endinterface
 // =====================
 
 import "BVI" VerilogBlockRAM_OneCycle =
-  module mkBlockRAM_Verilog(BlockRam#(addr, data))
+  module mkBlockRAM_Verilog(BlockRamv#(addr, data))
          provisos(Bits#(addr, addrWidth),
                   Bits#(data, dataWidth));
 

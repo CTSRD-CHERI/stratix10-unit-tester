@@ -24,7 +24,7 @@
 # specific language governing permissions and limitations under the License.
 #
 # @BERI_LICENSE_HEADER_END@
-# 
+#
 # ----------------------------------------------------------------------------
 # Build simulation unit test
 
@@ -36,6 +36,14 @@ TOP_RTL = tst$(SIM_NAME).bsv
 TOP_MODULE = top
 PYTHON_TESTER = tstdualportram.py
 DUTIP = /dev/null
+
+# Obtain config parameters
+DEFS = -D LogTransmitBufferLen=2 -D MacLatency=100
+DEFS += -D LinkTimeout=1024 -D TransmitBound=20
+DEFS += -D LogReliableLinkRecvBufferSize=9 -D LogMacRecvBufferSize=5
+DEFS += -D LogTransmitBufferSize=10 -D LogMaxFlitsPerMsg=2 -D MaxFlitsPerMsg=4 -D WordsPerFlit=4
+DEFS += -D NumNorthSouthLinks=1 -D NumEastWestLinks=0 -D Stratix10
+DEFS += -D DRAMsPerBoard=0
 
 # iverilog simulation directory:
 SIMI_DIR = ./output_files
@@ -55,6 +63,7 @@ BSC_SIM_FLAGS = -opt-undetermined-vals		\
 		-aggressive-conditions		\
 		-D BSV_NO_INITIAL_BLOCKS	\
 		-D BSIM				\
+		$(DEFS) -D SIMULATE -D DeviceFamily='"Stratix 10"' \
 		-verilog
 
 IVERILOG_FLAGS = -DBSV_NO_INITIAL_BLOCKS -DBSIM
@@ -122,7 +131,9 @@ clean:
 fpga_build:
 	cp $(DUTIP) $(DE10_PATH)/dutip.ip
 	cp VerilogBlockRAM.v $(DE10_PATH)/VerilogBlockRAM_OneCycle.v 	# bit of a hack to get the Verilog included
-	make -C $(DE10_PATH) fpga_image PYTHON_TESTER=$(PATH_DE10_TO_HERE)/$(PYTHON_TESTER) TOP_RTL=$(PATH_DE10_TO_HERE)/$(TOP_RTL) RTL_PATH=$(PATH_DE10_TO_HERE)
+	mkdir -p $(DE10_PATH)/dut_generated
+	cp AlteraBlockRam.sv $(DE10_PATH)/dut_generated/AlteraBlockRam.sv
+	BSC_FLAGS="$(DEFS)" make -C $(DE10_PATH) fpga_image PYTHON_TESTER=$(PATH_DE10_TO_HERE)/$(PYTHON_TESTER) TOP_RTL=$(PATH_DE10_TO_HERE)/$(TOP_RTL) RTL_PATH=$(PATH_DE10_TO_HERE)
 #VERILOG_INCLUDES=$(PATH_DE10_TO_HERE/VerilogBlockRAM.v)
 
 .PHONY: program_fpga
@@ -136,4 +147,3 @@ fpga_test:
 .PHONY: fpga_clean
 fpga_clean:
 	make -C $(DE10_PATH) clean
-
