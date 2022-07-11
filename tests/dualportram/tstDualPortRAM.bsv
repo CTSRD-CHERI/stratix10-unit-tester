@@ -34,52 +34,108 @@ import BlockRAMv          :: *;
 import FIFOF              :: *;
 
 typedef struct {
-   Bit#(1) re;       // read enable
-   Bit#(1) we;       // write enable
-   Bit#(9) rd_addr;  // read address
-   Bit#(9) wr_addr;  // write address
-   Bit#(32) wr_data; // write data
-   } CmdT deriving (Bits, Eq);
+   Bit#(1)  re;       // read enable
+   Bit#(1)  we;       // write enable
+   Bit#(9)  rd_addr;  // read address
+   Bit#(9)  wr_addr;  // write address
+   Bit#(32) wr_data;  // write data
+   } CmdSpT deriving (Bits, Eq);
+
+typedef struct {
+   // Port A
+   Bit#(1)  reA;      // read enable
+   Bit#(1)  weA;      // write enable
+   Bit#(12) addrA;    // address
+   Bit#(8)  wr_dataA; // write data
+   // Port B
+   Bit#(1)  reB;      // read enable
+   Bit#(1)  weB;      // write enable
+   Bit#(12) addrB;    // address
+   Bit#(8)  wr_dataB; // write data
+   } CmdDpT deriving (Bits, Eq);
 
 module top(Empty);
 
-  FPGADebugInterface        comms <- mkFPGADebugInterface();
-//  RegFile#(Bit#(9),Bit#(32)) m20k <- mkRegFileWCF(0,511); // M20K block is natively 512 x 40b but can also be used 512 x 32b
-  BlockRam#(Bit#(9),Bit#(32)) m20k <- mkBlockRAM_Verilog;
-  FIFOF#(CmdT)                  s <- mkSizedFIFOF(1024);
-  FIFOF#(Bit#(32))             rd <- mkSizedFIFOF(1024);
-  Reg#(Bool)      run_sequence[2] <- mkCReg(2, False);
-  
+  FPGADebugInterface          comms <- mkFPGADebugInterface();
+  //----For tests on single read, single write Block RAM
+  //  RegFile#(Bit#(9),Bit#(32)) m20k <- mkRegFileWCF(0,511); // M20K block is natively 512 x 40b but can also be used 512 x 32b
+  BlockRam#(Bit#(9),Bit#(32))  m20k <- mkBlockRAM_Verilog;
+  FIFOF#(CmdSpT)              cmdsp <- mkSizedFIFOF(1024);
+  FIFOF#(Bit#(32))             rdsp <- mkSizedFIFOF(1024);
+  Reg#(Bool)     run_sequence_sp[2] <- mkCReg(2, False);
+  //----For tests on true dual-port block RAM
+  BlockRamTrueDualPort#(Bit#(12),Bit#(8)) dpram <- mkDualPortBlockRAM_Verilog;
+  FIFOF#(CmdDpT)              cmddp <- mkSizedFIFOF(1024);
+  FIFOF#(Bit#(8))             rddpA <- mkSizedFIFOF(1024);
+  FIFOF#(Bit#(8))             rddpB <- mkSizedFIFOF(1024);
+  Reg#(Bool)     run_sequence_dp[2] <- mkCReg(2, False);
+
   rule handle_requests;
     DebugRequest r <- comms.request.get();
     case (r.cmd)
       Cmd_write_word:
-        if(r.idx == 0)
+        if(r.idx == 0) // read/write BRAM: write command
 	  begin
 	    Bit#(64) d = r.dat;
-      	    CmdT cmd = CmdT {
+      	    CmdSpT cmd = CmdSpT {
                re      : d[51],
 	       we      : d[50],
 	       rd_addr : d[49:41],
 	       wr_addr : d[40:32],
 	       wr_data : d[31:0]};
-	    s.enq(cmd);
+	    cmdsp.enq(cmd);
 	  end
-        else if(r.idx == 1)
-	  run_sequence[0] <= True;
+        else if(r.idx == 1) // read/write BRAM: trigger test sequence
+	  run_sequence_sp[0] <= True;
+        else if(r.idx == 2) // true dual-port BRAM: write command
+	  begin
+	    Bit#(64) d = r.dat;
+      	    CmdDpT cmd = CmdDpT {
+	       reB      : d[43],
+	       weB      : d[42],
+               reA      : d[41],
+	       weA      : d[40],
+	       addrB    : d[39:28], // 12-bit
+	       addrA    : d[27:16], // 12-bit
+	       wr_dataB : d[15:8],  // 8-bit
+	       wr_dataA : d[7:0]};  // 8-bit
+	    cmddp.enq(cmd);
+	    $display("reB=%1d  weB=%1d  reA=%1d  weA=%1d  addrB=%4d  addrA=%4d  wr_dataB=%3d wr_dataA=%3d",
+	       cmd.reB, cmd.weB, cmd.reA, cmd.weA, cmd.addrB, cmd.addrA, cmd.wr_dataB, cmd.wr_dataA);
+	  end
+        else if(r.idx == 3) // true dual-port BRAM: trigger test sequence
+	  run_sequence_dp[0] <= True;
         else
 	  $display("ERROR: invalid index %1d on write", r.idx);
       Cmd_read_word:
-        if(r.idx == 0)
-	  if(rd.notEmpty)
+        if(r.idx == 0) // read/write BRAM: read responses
+	  if(rdsp.notEmpty)
 	    begin
-	      comms.response.put(zeroExtend(rd.first));
-	      rd.deq;
+	      comms.response.put(zeroExtend(rdsp.first));
+	      rdsp.deq;
 	    end
           else
 	    comms.response.put(64'hdeaddead00000000);
-        else if(r.idx == 1)
-	  comms.response.put(zeroExtend({pack(run_sequence[0]),pack(s.notFull),pack(s.notEmpty),pack(rd.notFull),pack(rd.notEmpty)}));
+        else if(r.idx == 1) // read/write BRAM: read flags
+	  comms.response.put(zeroExtend({pack(run_sequence_sp[0]),pack(cmdsp.notFull),pack(cmdsp.notEmpty),pack(rdsp.notFull),pack(rdsp.notEmpty)}));
+        else if(r.idx == 2) // true dual-port BRAM: read response port A
+	  if(rddpA.notEmpty)
+	    begin
+	      comms.response.put(zeroExtend(rddpA.first));
+	      rddpA.deq;
+	    end
+          else
+	    comms.response.put(64'hdeaddead00000000);
+        else if(r.idx == 3) // true dual-port BRAM: read response port B
+	  if(rddpB.notEmpty)
+	    begin
+	      comms.response.put(zeroExtend(rddpB.first));
+	      rddpB.deq;
+	    end
+          else
+	    comms.response.put(64'hdeaddead00000000);
+        else if(r.idx == 4) // true dual-port BRAM: read flags
+	  comms.response.put(zeroExtend({pack(run_sequence_dp[0]),pack(cmddp.notFull),pack(cmddp.notEmpty),pack(rddpB.notFull),pack(rddpB.notEmpty),pack(rddpA.notFull),pack(rddpA.notEmpty)}));
         else
 	  $display("ERROR: invalid index %1d on read", r.idx);
       default:
@@ -87,23 +143,46 @@ module top(Empty);
     endcase
   endrule
 
-  rule do_sequence(run_sequence[1]);
-    if(s.notEmpty)
+  rule do_sequence_sp(run_sequence_sp[1]);
+    if(cmdsp.notEmpty)
       begin
-	CmdT cmd = s.first;
-	s.deq;
+	CmdSpT cmd = cmdsp.first;
+	cmdsp.deq;
 	if(cmd.we==1)
 	  m20k.write(cmd.wr_addr, cmd.wr_data);
 	  // m20k.upd(cmd.wr_addr, cmd.wr_data);
         if(cmd.re==1)
 	  m20k.read(cmd.rd_addr);
-	  // rd.enq(m20k.sub(cmd.rd_addr));
+	  // rdsp.enq(m20k.sub(cmd.rd_addr));
       end
     else
-      run_sequence[1] <= False;
+      run_sequence_sp[1] <= False;
   endrule
 
-  rule store_reads(m20k.dataOutValid);
-    rd.enq(m20k.dataOut);
+  rule store_reads_sp(m20k.dataOutValid);
+    rdsp.enq(m20k.dataOut);
+  endrule  
+
+  rule do_sequence_dp(run_sequence_dp[1]);
+    if(cmddp.notEmpty)
+      begin
+	CmdDpT cmd = cmddp.first;
+	cmddp.deq;
+	if((cmd.weA==1) || (cmd.reA==1))
+	   dpram.putA(cmd.weA==1, cmd.addrA, cmd.wr_dataA);
+	if((cmd.weB==1) || (cmd.reB==1))
+	   dpram.putB(cmd.weB==1, cmd.addrB, cmd.wr_dataB);
+      end
+    else
+      run_sequence_dp[1] <= False;
+  endrule
+
+  rule store_reads_dpA(dpram.dataOutValidA);
+    rddpA.enq(dpram.dataOutA);
+    $display("dataOutA = %3d", dpram.dataOutA);
+  endrule  
+  rule store_reads_dpB(dpram.dataOutValidB);
+    rddpB.enq(dpram.dataOutB);
+    $display("dataOutB = %3d", dpram.dataOutB);
   endrule  
 endmodule

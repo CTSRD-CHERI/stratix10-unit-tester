@@ -44,40 +44,50 @@ class simple_test:
         try:
             r = self.dbg.read(idx)
             if(r != expected):
-                print("ERROR: reg[%1d]=%2d but expected %2d" % (idx, r, expected))
+                print("ERROR: cmdreg[%1d]=%2d but expected %2d" % (idx, r, expected))
                 self.error = True
             else:
-                print("reg[%1d] == %2d" % (idx, r))
+                print("cmdreg[%1d] == %2d" % (idx, r))
         except:
             print("Exception during read of idx=%d" % (idx))
             self.error = True
 
     def write_report(self, idx, data):
         self.dbg.write(idx, data)
-        print("reg[%1d] <= %2d" % (idx, data))
+        print("cmdreg[%1d] <= 0x%08x" % (idx, data))
 
-    def write_cmd(self, re, we, rd_addr, wr_addr, wr_data):
+    # write command to single read, single write BRAM tester
+    def write_cmd_sp(self, re, we, rd_addr, wr_addr, wr_data):
         cmd = ((re & 0x1)<<51) | ((we & 0x1)<<50) | ((rd_addr & 0x1ff)<<41) | ((wr_addr & 0x1ff)<<32) | (wr_data & 0xffffffff)
         self.write_report(0,cmd)
 
-    def running(self):
+    # write command to true dual-port BRAM tester
+    def write_cmd_dp(self, reB, weB, reA, weA, addrB, addrA, wr_dataB, wr_dataA):
+        cmd = ((reB & 0x1)<<43) | ((weB & 0x1)<<42) | ((reA & 0x1)<<41) | ((weA & 0x1)<<40) | ((addrB & 0xfff)<<28) | ((addrA & 0xfff)<<16) | ((wr_dataB & 0xff) << 8) | (wr_dataA & 0xff)
+        self.write_report(2,cmd)
+
+    def running_sp(self):
         return (self.dbg.read(1)>>4) & 0x1
-    
-    def run_test(self):
+
+    def running_dp(self):
+        return (self.dbg.read(1)>>6) & 0x1
+
+    # Tests for single read, single write BRAM
+    def run_test_spbram(self):
         self.dbg.clear()
         print("Writing command sequence")
         for j in range(16):  # seqence of writes
-            self.write_cmd(0,1,0,j,j+10000)
+            self.write_cmd_sp(0,1,0,j,j+10000)
         for j in range(16):  # sequence of reads
-            self.write_cmd(1,0,j,0,0)
+            self.write_cmd_sp(1,0,j,0,0)
         for j in range(16):  # sequence of write and reads reads
-            self.write_cmd(1,1,j,j,j+20000)
+            self.write_cmd_sp(1,1,j,j,j+20000)
         for j in range(16):  # sequence of write and reads reads
-            self.write_cmd(1,1,j^1,j,j+30000)
-#            self.write_cmd(1,1,(j+15) % 16,j,j+30000)
+            self.write_cmd_sp(1,1,j^1,j,j+30000)
+#            self.write_cmd_sp(1,1,(j+15) % 16,j,j+30000)
         print("Run sequence")
         self.write_report(1,1)
-        while(self.running()):
+        while(self.running_sp()):
             print("Waiting for test sequence to finish")
         print("Reading values read")
         for j in range(16):
@@ -87,6 +97,28 @@ class simple_test:
         for j in range(16):
             print("mem[%2d] = %d" % (j^1,self.dbg.read(0)))
 #            print("mem[%2d] = %d" % ((j+15) % 16,self.dbg.read(0)))
+        self.dbg.end_simulation()
+    
+    # Tests for true dual-port BRAM
+    def run_test_dpbram(self):
+        self.dbg.clear()
+        print("Writing command sequence")
+        for j in range(16):  # seqence of writes to Port A and B
+            self.write_cmd_dp(0,1, 0,1, j*2+1,j*2, j+200,j+100)
+        for j in range(16):  # sequence of reads from Port B and A
+            self.write_cmd_dp(1,0, 1,0, j*2,j*2+1, 0,0)
+        print("Run sequence")
+        self.write_report(3,1)
+        while(self.running_dp()):
+            print("Waiting for test sequence to finish")
+        print("Reading values read from port A")
+        for j in range(16):
+            d = self.dbg.read(2)
+            print("mem[%2d] = %d = 0x%08x" % (j*2+1,d,d))
+        print("Reading values read from port B")
+        for j in range(16):
+            d = self.dbg.read(3)
+            print("mem[%2d] = %d = 0x%08x" % (j*2,d,d))
         self.dbg.end_simulation()
     
 if __name__ == "__main__":
@@ -104,7 +136,8 @@ if __name__ == "__main__":
         print("Simulation starting for %d iterations" % (args.n))
     test = simple_test(args.sim)
     for j in range(args.n):
-        test.run_test()
+        # test.run_test_spbram() # test single read, single write BRAM
+        test.run_test_dpbram()  # test true dual-port BRAM
         if(test.error):
             print("Test %d result: FAIL" % (j))
             exit(-1)
