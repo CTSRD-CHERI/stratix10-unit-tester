@@ -40,7 +40,7 @@ DUTIP = /dev/null
 # iverilog simulation directory:
 SIMI_DIR = ./output_files
 
-VERILOG_INCLUDES = $(SIMI_DIR)/mkFPGADebugInterface.v VerilogBlockRAM.v
+VERILOG_INCLUDES = $(SIMI_DIR)/mkFPGADebugInterface.v VerilogBlockRAM_OneCycle.v VerilogBlockRAM_TrueDualPort_OneCycle.v
 
 GENERIC_SIM_DIR = ./
 IVERILOG_WRAPPER = wrapper-iverilog.v
@@ -121,7 +121,7 @@ clean:
 .PHONY:
 fpga_build:
 	cp $(DUTIP) $(DE10_PATH)/dutip.ip
-	cp VerilogBlockRAM.v $(DE10_PATH)/VerilogBlockRAM_OneCycle.v 	# bit of a hack to get the Verilog included
+	cp VerilogBlockRAM_OneCycle.v VerilogBlockRAM_TrueDualPort_OneCycle.v $(DE10_PATH)/
 	make -C $(DE10_PATH) fpga_image PYTHON_TESTER=$(PATH_DE10_TO_HERE)/$(PYTHON_TESTER) TOP_RTL=$(PATH_DE10_TO_HERE)/$(TOP_RTL) RTL_PATH=$(PATH_DE10_TO_HERE)
 #VERILOG_INCLUDES=$(PATH_DE10_TO_HERE/VerilogBlockRAM.v)
 
