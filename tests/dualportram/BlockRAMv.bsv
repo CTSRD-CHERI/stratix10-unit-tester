@@ -161,11 +161,21 @@ module mkBlockRamTrueMixedBE
   Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM_Verilog);
   // addrB needed during read to select the right word
   Reg#(addrB) save_addrB <- mkReg(unpack(0));
+  Wire#(Maybe#(addrA)) check_addrA <- mkDWire(Invalid);
+  Wire#(Maybe#(addrB)) check_addrB <- mkDWire(Invalid);
+  
+  rule assert_no_write_collision(isValid(check_addrA) && isValid(check_addrB));
+    Bit#(awidthA) addrA = pack(fromMaybe(?, check_addrA));
+    Bit#(awidthA) addrB = truncate(pack(fromMaybe(?, check_addrB))>>valueOf(aExtra));
+    if(addrA == addrB) // TODO: turn this into a dynamic assertion
+      $display("ERROR in mkBlockRamTrueMixedBE: address collision on two writes");
+  endrule
   
   method Action putA(wr, a, x);
     Bit#(dwidthA) data = pack(x);
     for(Integer n=0; n<valueOf(dataABytes); n=n+1)
 	rams[n].putA(wr, pack(a), data[n*8+7:n*8]);
+    if(wr) check_addrA <= tagged Valid a;
   endmethod
   
   method Action putB(wr, a, x, be);
@@ -180,6 +190,7 @@ module mkBlockRamTrueMixedBE
 	  rams[bram_select].putB(wr, addr, data[n*8+7:n*8]);
 	end
     save_addrB <= a;
+    if(wr) check_addrB <= tagged Valid a;
   endmethod
   
   method dataA dataOutA;
