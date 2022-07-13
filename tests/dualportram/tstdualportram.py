@@ -28,7 +28,7 @@
 # @BERI_LICENSE_HEADER_END@
 # 
 # ----------------------------------------------------------------------------
-# Simple test of FPGADebugInterface
+# Test various memories
 
 import sys
 sys.path.append(r'../../py')
@@ -54,7 +54,7 @@ class simple_test:
 
     def write_report(self, idx, data):
         self.dbg.write(idx, data)
-        print("cmdreg[%1d] <= 0x%08x" % (idx, data))
+        print("cmdreg[%2d] <= 0x%016x" % (idx, data))
 
     # write command to single read, single write BRAM tester
     def write_cmd_sp(self, re, we, rd_addr, wr_addr, wr_data):
@@ -66,11 +66,22 @@ class simple_test:
         cmd = ((reB & 0x1)<<43) | ((weB & 0x1)<<42) | ((reA & 0x1)<<41) | ((weA & 0x1)<<40) | ((addrB & 0xfff)<<28) | ((addrA & 0xfff)<<16) | ((wr_dataB & 0xff) << 8) | (wr_dataA & 0xff)
         self.write_report(2,cmd)
 
+    # write command to multi-width true dual-port BRAM tester
+    def write_cmd_mw(self, reB, weB, reA, weA, beB, addrB, addrA, wr_dataB, wr_dataA_hi, wr_dataA_lo):
+        self.write_report(8,wr_dataB);
+        self.write_report(7,wr_dataA_hi);
+        self.write_report(6,wr_dataA_lo);
+        cmd = ((reB & 0x1)<<35) | ((weB & 0x1)<<34) | ((reA & 0x1)<<33) | ((weA & 0x1)<<32) | ((beB & 0xf)<<28) | ((addrB & 0x7fff)<<13) | (addrA & 0x1fff)
+        self.write_report(4,cmd)
+
     def running_sp(self):
         return (self.dbg.read(1)>>4) & 0x1
 
     def running_dp(self):
-        return (self.dbg.read(1)>>6) & 0x1
+        return (self.dbg.read(4)>>6) & 0x1
+
+    def running_mw(self):
+        return (self.dbg.read(8)>>6) & 0x1
 
     # Tests for single read, single write BRAM
     def run_test_spbram(self):
@@ -121,6 +132,33 @@ class simple_test:
             print("mem[%2d] = %d = 0x%08x" % (j*2,d,d))
         self.dbg.end_simulation()
     
+    # Tests for multi-width true dual-port BRAM
+    def run_test_mwbram(self):
+        self.dbg.clear()
+        print("Writing command sequence")
+        # write_cmd_mw(reB, weB, reA, weA, beB, addrB, addrA, wr_dataB, wr_dataA_hi, wr_dataA_lo):
+        for j in range(16):  # seqence of writes to Port A and B
+            self.write_cmd_mw(0,1, 0,1, 0xf, (j*2+1)*4,j*2, j | 0x3000,j | 0x2000,j | 0x1000)
+        for j in range(16):  # seqence of writes to Port B
+            for k in range(3):
+                self.write_cmd_mw(0,1, 0,0, 0xf, (j*2+1)*4+k+1,0, j | 0x1100, 0xdeaddead, 0xdeaddead)
+        for j in range(32):  # sequence of reads from Port A
+            self.write_cmd_mw(0,0, 1,0, 0xf, 0,j, 3,2,1)
+        print("Run sequence")
+        self.write_report(9,1)
+        while(self.running_mw()):
+            print("Waiting for test sequence to finish")
+        print("Reading values read from port A")
+        for j in range(32):
+            d_upper = self.dbg.read(6)
+            d_lower = self.dbg.read(5)
+            print("mem[%2d] = 0x%016x 0x%016x" % (j,d_upper,d_lower))
+#        print("Reading values read from port B")
+#        for j in range(16):
+#            d = self.dbg.read(3)
+#            print("mem[%2d] = %d = 0x%08x" % (j*2,d,d))
+        self.dbg.end_simulation()
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
@@ -137,7 +175,7 @@ if __name__ == "__main__":
     test = simple_test(args.sim)
     for j in range(args.n):
         # test.run_test_spbram() # test single read, single write BRAM
-        test.run_test_dpbram()  # test true dual-port BRAM
+        test.run_test_mwbram()  # test true dual-port BRAM
         if(test.error):
             print("Test %d result: FAIL" % (j))
             exit(-1)
