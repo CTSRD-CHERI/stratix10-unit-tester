@@ -74,12 +74,12 @@ module top(Empty);
   FPGADebugInterface          comms <- mkFPGADebugInterface();
   //----For tests on single read, single write Block RAM
   //  RegFile#(Bit#(9),Bit#(32)) m20k <- mkRegFileWCF(0,511); // M20K block is natively 512 x 40b but can also be used 512 x 32b
-  BlockRam#(Bit#(9),Bit#(32))  m20k <- mkBlockRAM_Verilog;
+  BlockRam#(Bit#(9),Bit#(32))  m20k <- mkBlockRAM;
   FIFOF#(CmdSpT)              cmdsp <- mkSizedFIFOF(1024);
   FIFOF#(Bit#(32))             rdsp <- mkSizedFIFOF(1024);
   Reg#(Bool)     run_sequence_sp[2] <- mkCReg(2, False);
   //----For tests on true dual-port block RAM
-  BlockRamTrueDualPort#(Bit#(12),Bit#(8)) dpram <- mkDualPortBlockRAM_Verilog;
+  BlockRamTrueDualPort#(Bit#(12),Bit#(8)) dpram <- mkDualPortBlockRAM;
   FIFOF#(CmdDpT)              cmddp <- mkSizedFIFOF(1024);
   FIFOF#(Bit#(8))             rddpA <- mkSizedFIFOF(1024);
   FIFOF#(Bit#(8))             rddpB <- mkSizedFIFOF(1024);
