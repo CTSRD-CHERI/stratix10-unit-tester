@@ -28,8 +28,10 @@
 
 package BlockRAMv;
 
-import Vector :: *;
-import Assert :: *;
+import Vector  :: *;
+import Assert  :: *;
+import RegFile :: *;
+import DReg    :: *;
 
 // ==========
 // Interfaces
@@ -64,6 +66,7 @@ endinterface
 // Verilog Instatiations
 // =====================
 
+`ifndef BSIM
 import "BVI" VerilogBlockRAM_OneCycle =
   module mkBlockRAM_Verilog(BlockRam#(addr, data))
          provisos(Bits#(addr, addrWidth),
@@ -86,8 +89,11 @@ import "BVI" VerilogBlockRAM_OneCycle =
     schedule (write)        C  (write);
     schedule (read)         C  (read);
   endmodule
+`endif
 
 
+`ifndef BSIM
+// Verilog true dual-port block RAM for Verilog simulation and synthesis
 import "BVI" VerilogBlockRAM_TrueDualPort_OneCycle =
   module mkDualPortBlockRAM_Verilog(BlockRamTrueDualPort#(addr, data))
          provisos(Bits#(addr, addrWidth),
@@ -116,7 +122,127 @@ import "BVI" VerilogBlockRAM_TrueDualPort_OneCycle =
     schedule (putA)          C  (putA);
     schedule (putB)          C  (putB);
   endmodule
+`endif
 
+
+// ===========================================
+// Bluespec module memory primates for Bluesim
+// ===========================================
+
+module mkBlockRAM_Bluesim(BlockRam#(addr, data))
+  provisos(Bits#(addr, addrWidth),
+	   Bits#(data, dataWidth),
+	   Bounded#(addr));
+
+  RegFile#(addr, data)    ram <- mkRegFileFull;
+  Reg#(data)       dataOutReg <- mkReg(unpack(0));
+  Reg#(Bool)  dataOutValidReg <- mkDReg(False);
+  
+  method Action write(addr a, data d) = ram.upd(a, d);
+  method Action read(addr a);
+    dataOutReg <= ram.sub(a);
+    dataOutValidReg <= True;
+  endmethod
+  method data dataOut = dataOutReg;
+  method Bool dataOutValid = dataOutValidReg;
+endmodule
+  
+
+// Matt Naylor's dual-port BRAM using RegFile, for simulation only
+module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
+  provisos(Bits#(addr, addrWidth),
+	   Bits#(data, dataWidth),
+	   Bounded#(addr),
+	   Literal#(data));
+
+  RegFile#(addr, data) regFileA <- mkRegFileFull;
+  RegFile#(addr, data) regFileB <- mkRegFileFull;
+  RegFile#(addr, Bit#(64)) regFileALastWriteTime <- mkRegFileFull;
+  RegFile#(addr, Bit#(64)) regFileBLastWriteTime <- mkRegFileFull;
+  Reg#(Bit#(64)) timer <- mkReg(64'haaaaaaaaaaaaaaab); // gross hack due to the above RegFiles being initialsied to this value
+  Reg#(data) dataOutAReg <- mkReg(0);
+  Reg#(data) dataOutBReg <- mkReg(0);
+  Reg#(Bool) dataOutValidAReg <- mkDReg(False);
+  Reg#(Bool) dataOutValidBReg <- mkDReg(False);
+
+  rule updateTimer;
+    timer <= timer + 1;
+    dynamicAssert(timer < 64'hffffffff_ffffffff,
+      "End of timer lifetime.  Panic!");
+  endrule
+
+  method Action putA(Bool we, addr a, data d);
+    if (we)
+      begin
+	regFileA.upd(a, d);
+	regFileALastWriteTime.upd(a, timer);
+      end
+    else
+      dataOutValidAReg <= True;
+    dataOutAReg <=
+      regFileALastWriteTime.sub(a) >= regFileBLastWriteTime.sub(a) ?
+        regFileA.sub(a) : regFileB.sub(a);
+  endmethod
+  method data dataOutA = dataOutAReg;
+  method Bool dataOutValidA = dataOutValidAReg;
+
+  method Action putB(Bool we, addr a, data d);
+    if (we)
+      begin
+	regFileB.upd(a, d);
+	regFileBLastWriteTime.upd(a, timer);
+      end
+    else
+      dataOutValidBReg <= True;
+    dataOutBReg <=
+      regFileALastWriteTime.sub(a) >= regFileBLastWriteTime.sub(a) ?
+        regFileA.sub(a) : regFileB.sub(a);
+  endmethod
+
+  method data dataOutB = dataOutBReg;
+  method Bool dataOutValidB = dataOutValidBReg;
+
+endmodule
+
+  
+// ================================================
+// Select memory primative based on simulation mode
+// ================================================
+
+module mkBlockRAM(BlockRam#(addr, data))
+  provisos(Bits#(addr, addrWidth),
+	   Bits#(data, dataWidth),
+	   Bounded#(addr));
+`ifdef BSIM
+  BlockRam#(addr,data) ram <- mkBlockRAM_Bluesim;
+`else
+  BlockRam#(addr,data) ram <- mkBlockRAM_Verilog;
+`endif
+  method write = ram.write;
+  method read = ram.read;
+  method dataOut = ram.dataOut;
+  method dataOutValid = ram.dataOutValid;
+endmodule
+
+
+module mkDualPortBlockRAM(BlockRamTrueDualPort#(addr, data))
+  provisos(Bits#(addr, addrWidth),
+	   Bits#(data, dataWidth),
+	   Bounded#(addr),
+	   Literal#(data));
+
+`ifdef BSIM
+  BlockRamTrueDualPort#(addr,data) ram <- mkDualPortBlockRAM_Bluesim;
+`else
+  BlockRamTrueDualPort#(addr,data) ram <- mkDualPortBlockRAM_Verilog;
+`endif
+  method putA = ram.putA;
+  method dataOutA = ram.dataOutA;
+  method dataOutValidA = ram.dataOutValidA;
+  method putB = ram.putB;
+  method dataOutB = ram.dataOutB;
+  method dataOutValidB = ram.dataOutValidB;
+endmodule
 
 // =====================================================
 // Bluespec modules that use the Verilog BRAM primatives
@@ -130,11 +256,11 @@ interface BlockRamTrueMixedByteEn#
              type addrB, type dataB,
              numeric type dataBBytes);
   // Port A
-  method Action putA(Bool wr, addrA a, dataA x);
+  method Action putA(Bool wr, addrA a, dataA d);
   method dataA dataOutA;
   method Bool dataOutValidA; // added to original interface to indicate when data is available
   // Port B
-  method Action putB(Bool wr, addrB a, dataB x, Bit#(dataBBytes) be);
+  method Action putB(Bool wr, addrB a, dataB d, Bit#(dataBBytes) be);
   method dataB dataOutB;
   method Bool dataOutValidB; // added to original interface to indicate when data is available
 endinterface
@@ -158,27 +284,33 @@ module mkBlockRamTrueMixedBE
 	     Add#(aExtra, logdataBBytes, logdataABytes));
 
   // Instatitate byte-wide RAMs to fit the data width of port A since it is the widest port
-  Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM_Verilog);
+//`ifdef BSIM
+//  Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM_Bluesim);
+//`else
+//  Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM_Verilog);
+//`endif
+  Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM);
+  
   // addrB needed during read to select the right word
   Reg#(addrB) save_addrB <- mkReg(unpack(0));
   Wire#(Maybe#(addrA)) check_addrA <- mkDWire(Invalid);
   Wire#(Maybe#(addrB)) check_addrB <- mkDWire(Invalid);
   
+  // For simulation only. Should be optimised away on FPGA.
   rule assert_no_write_collision(isValid(check_addrA) && isValid(check_addrB));
     Bit#(awidthA) addrA = pack(fromMaybe(?, check_addrA));
     Bit#(awidthA) addrB = truncate(pack(fromMaybe(?, check_addrB))>>valueOf(aExtra));
-    if(addrA == addrB) // TODO: turn this into a dynamic assertion
-      $display("ERROR in mkBlockRamTrueMixedBE: address collision on two writes");
+    dynamicAssert(addrA != addrB, "ERROR in mkBlockRamTrueMixedBE: address collision on two writes");
   endrule
   
-  method Action putA(wr, a, x);
-    Bit#(dwidthA) data = pack(x);
+  method Action putA(wr, a, d);
+    Bit#(dwidthA) data = pack(d);
     for(Integer n=0; n<valueOf(dataABytes); n=n+1)
 	rams[n].putA(wr, pack(a), data[n*8+7:n*8]);
     if(wr) check_addrA <= tagged Valid a;
   endmethod
   
-  method Action putB(wr, a, x, be);
+  method Action putB(wr, a, d, be);
     for(Integer n=0; n<valueOf(dataBBytes); n=n+1)
       if(be[n]==1)
 	begin
@@ -186,7 +318,7 @@ module mkBlockRamTrueMixedBE
 	  Bit#(logdataBBytes) byte_select = fromInteger(n);
 	  Bit#(logdataABytes) bram_select = {bank_select, byte_select};
 	  Bit#(awidthA) addr = truncate(unpack(pack(a) >> valueOf(aExtra)));
-	  Bit#(dwidthB) data = pack(x);
+	  Bit#(dwidthB) data = pack(d);
 	  rams[bram_select].putB(wr, addr, data[n*8+7:n*8]);
 	end
     save_addrB <= a;
@@ -194,13 +326,14 @@ module mkBlockRamTrueMixedBE
   endmethod
   
   method dataA dataOutA;
-     Vector#(dataABytes,Bit#(8)) b;
-     for(Integer n=0; n<valueOf(dataABytes); n=n+1)
-       begin
-	 b[n] = rams[n].dataOutA;
-	 //dynamicAssert(dataOutValidA[n],"DEBUG: mkBlockRamTrueMixedBE: Reading byte "+integerToString(n)+" from port A but data is not valid");
+    Vector#(dataABytes,Bit#(8)) b;
+    for(Integer n=0; n<valueOf(dataABytes); n=n+1)
+      begin
+	b[n] = rams[n].dataOutA;
+	 let v = rams[n].dataOutValidA;
+//	 dynamicAssert(v,"ERROR in mkBlockRamTrueMixedBE: Reading byte ");  //+integerToString(n)+" from port A but data is not valid");
        end
-     return unpack(pack(b));
+    return unpack(pack(b));
   endmethod
      
   method dataB dataOutB;
@@ -211,13 +344,11 @@ module mkBlockRamTrueMixedBE
 	 Bit#(logdataBBytes) byte_select = fromInteger(n);
 	 Bit#(logdataABytes) bram_select = {bank_select, byte_select};
 	 b[n] = rams[bram_select].dataOutA;
-	 //dynamicAssert(dataOutValidB[n],"DEBUG: mkBlockRamTrueMixedBE: Reading byte "+integerToString(n)+" from port A but data is not valid");
+//	 dynamicAssert(rams[n].dataOutValidB,"ERROR in mkBlockRamTrueMixedBE: Reading byte "+integerToString(n)+" from port A but data is not valid");
        end
      return unpack(pack(b));
   endmethod  
   
-//  method Bool dataOutValidA = fold(\|| , map(getDataOutValidA, rams));
-//  method Bool dataOutValidB = fold(\|| , map(getDataOutValidB, rams));
   // just return valid from first RAM since the timing for all of them is the same and all read?
   method Bool dataOutValidA = rams[0].dataOutValidA;
   method Bool dataOutValidB = rams[0].dataOutValidB;
