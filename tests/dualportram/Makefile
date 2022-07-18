@@ -50,24 +50,31 @@ IVERILOG_SIM  = $(SIMI_DIR)/sim_$(TOP_MODULE)
 BLUESPEC_INSTALL_ROOT = $(BLUESPEC)
 BLUESPEC_VERILOG = $(BLUESPEC_INSTALL_ROOT)/lib/Verilog
 BSV_LIBS = $(RTL_PATH)/*.bsv
-BSC_SIM_FLAGS = -opt-undetermined-vals		\
-		-unspecified-to X		\
+BSC_FLAGS = 	-opt-undetermined-vals		\
 		-aggressive-conditions		\
-		-D BSV_NO_INITIAL_BLOCKS	\
-		-D BSIM				\
-		-verilog
+		-D BSV_NO_INITIAL_BLOCKS
+BSC_SIM_FLAGS = $(BSC_FLAGS) -D BSIM
 
-IVERILOG_FLAGS = -DBSV_NO_INITIAL_BLOCKS -DBSIM
+IVERILOG_FLAGS = -DBSV_NO_INITIAL_BLOCKS
 
 .PHONY: all
 all: simi
 
-.PHONY: test
-test: simi
+.PHONY: test_verilog
+test_verilog: simi
 	@rm -f bytepipe-host2hw bytepipe-hw2host
 	@mkfifo bytepipe-host2hw
 	@mkfifo bytepipe-hw2host
 	$(IVERILOG_SIM) > $(SIMI_DIR)/iverilog.log &
+	python3 $(PYTHON_TESTER) --sim
+	@rm bytepipe-host2hw bytepipe-hw2host
+
+.PHONY: test_bluesim
+test_bluesim: $(SIMI_DIR) $(TOP_MODULE)
+	@rm -f bytepipe-host2hw bytepipe-hw2host
+	@mkfifo bytepipe-host2hw
+	@mkfifo bytepipe-hw2host
+	./$(TOP_MODULE) > $(SIMI_DIR)/bluesim.log &
 	python3 $(PYTHON_TESTER) --sim
 	@rm bytepipe-host2hw bytepipe-hw2host
 
@@ -85,6 +92,7 @@ runsimi: $(IVERILOG_SIM)
 	$(IVERILOG_SIM)
 	rm bytepipe-host2hw bytepipe-hw2host
 
+# run iverilog simulation
 $(IVERILOG_SIM): $(SIMI_DIR) $(SIMI_DIR)/$(TOP_MODULE).v $(GENERIC_SIM_DIR)/$(IVERILOG_WRAPPER) $(VERILOG_INCLUDES)
 	cp $(GENERIC_SIM_DIR)/$(IVERILOG_WRAPPER) $(SIMI_DIR)
 	iverilog $(IVERILOG_FLAGS) 			\
@@ -96,8 +104,10 @@ $(IVERILOG_SIM): $(SIMI_DIR) $(SIMI_DIR)/$(TOP_MODULE).v $(GENERIC_SIM_DIR)/$(IV
 		$(VERILOG_INCLUDES)			\
 		 $(SIMI_DIR)/top.v
 
+# compile to Verilog simulation
 $(SIMI_DIR)/$(TOP_MODULE).v: $(SIMI_DIR) $(TOP_RTL) $(BSV_LIBS)
-	bsc $(BSC_SIM_FLAGS) 				\
+	bsc $(BSC_SIM_FLAGS) -verilog			\
+		-unspecified-to X			\
 		-vsim iverilog				\
 	    	-simdir $(SIMI_DIR)    			\
 	    	-vdir $(SIMI_DIR)			\
@@ -107,13 +117,31 @@ $(SIMI_DIR)/$(TOP_MODULE).v: $(SIMI_DIR) $(TOP_RTL) $(BSV_LIBS)
 $(SIMI_DIR):
 	mkdir -p $(SIMI_DIR)
 
+# compile to Bluesim version
+$(TOP_MODULE): $(TOP_MODULE).ba
+	bsc $(BSC_SIM_FLAGS) -sim			\
+		-D SIMULATE				\
+	    	-simdir $(SIMI_DIR)    			\
+		-p +:$(RTL_PATH)                        \
+	    	-e $(TOP_MODULE)			\
+	    	-o $(TOP_MODULE)
+
+
+$(TOP_MODULE).ba: $(SIMI_DIR) $(TOP_RTL) $(BSV_LIBS)
+	bsc $(BSC_SIM_FLAGS) -sim			\
+		-D SIMULATE				\
+	    	-simdir $(SIMI_DIR)    			\
+		-D BSIM					\
+		-p +:$(RTL_PATH)                        \
+	    	-g $(TOP_MODULE) -u $(TOP_RTL)
+
 #-----------------------------------------------------------------------------
 # clean up
 .PHONY: clean
 clean:
 	rm -rf $(SIMI_DIR)
 	rm -rf __pycache__
-	rm -f *.bo
+	rm -f *.bo *.ba
 	make -C $(RTL_PATH) clean
 
 #-----------------------------------------------------------------------------
