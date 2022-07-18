@@ -66,7 +66,7 @@ endinterface
 // Verilog Instatiations
 // =====================
 
-`ifndef BSIM
+`ifndef SIMULATE
 import "BVI" VerilogBlockRAM_OneCycle =
   module mkBlockRAM_Verilog(BlockRam#(addr, data))
          provisos(Bits#(addr, addrWidth),
@@ -92,7 +92,7 @@ import "BVI" VerilogBlockRAM_OneCycle =
 `endif
 
 
-`ifndef BSIM
+`ifndef SIMULATE
 // Verilog true dual-port block RAM for Verilog simulation and synthesis
 import "BVI" VerilogBlockRAM_TrueDualPort_OneCycle =
   module mkDualPortBlockRAM_Verilog(BlockRamTrueDualPort#(addr, data))
@@ -129,6 +129,7 @@ import "BVI" VerilogBlockRAM_TrueDualPort_OneCycle =
 // Bluespec module memory primates for Bluesim
 // ===========================================
 
+`ifdef SIMULATE
 module mkBlockRAM_Bluesim(BlockRam#(addr, data))
   provisos(Bits#(addr, addrWidth),
 	   Bits#(data, dataWidth),
@@ -146,8 +147,9 @@ module mkBlockRAM_Bluesim(BlockRam#(addr, data))
   method data dataOut = dataOutReg;
   method Bool dataOutValid = dataOutValidReg;
 endmodule
-  
+`endif
 
+`ifdef SIMULATE
 // Matt Naylor's dual-port BRAM using RegFile, for simulation only
 module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
   provisos(Bits#(addr, addrWidth),
@@ -203,7 +205,7 @@ module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
   method Bool dataOutValidB = dataOutValidBReg;
 
 endmodule
-
+`endif
   
 // ================================================
 // Select memory primative based on simulation mode
@@ -213,7 +215,7 @@ module mkBlockRAM(BlockRam#(addr, data))
   provisos(Bits#(addr, addrWidth),
 	   Bits#(data, dataWidth),
 	   Bounded#(addr));
-`ifdef BSIM
+`ifdef SIMULATE
   BlockRam#(addr,data) ram <- mkBlockRAM_Bluesim;
 `else
   BlockRam#(addr,data) ram <- mkBlockRAM_Verilog;
@@ -231,7 +233,7 @@ module mkDualPortBlockRAM(BlockRamTrueDualPort#(addr, data))
 	   Bounded#(addr),
 	   Literal#(data));
 
-`ifdef BSIM
+`ifdef SIMULATE
   BlockRamTrueDualPort#(addr,data) ram <- mkDualPortBlockRAM_Bluesim;
 `else
   BlockRamTrueDualPort#(addr,data) ram <- mkDualPortBlockRAM_Verilog;
@@ -284,11 +286,6 @@ module mkBlockRamTrueMixedBE
 	     Add#(aExtra, logdataBBytes, logdataABytes));
 
   // Instatitate byte-wide RAMs to fit the data width of port A since it is the widest port
-//`ifdef BSIM
-//  Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM_Bluesim);
-//`else
-//  Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM_Verilog);
-//`endif
   Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM);
   
   // addrB needed during read to select the right word
