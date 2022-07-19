@@ -39,7 +39,15 @@ class simple_test:
     def __init__(self, simulation_mode):
         self.error = False
         self.dbg = fpga_debug_interface.debug_interface(sim=simulation_mode)  # True=simulate, False=on FPGA
+        self.init_ram()
 
+    def init_ram(self):
+        self.ram = [None] * 1024
+        self.ram = [None] * 1024
+        self.respAhi = []
+        self.respAlo = []
+        self.respB = []
+        
     def read_check(self, idx, expected):
         try:
             r = self.dbg.read(idx)
@@ -73,6 +81,19 @@ class simple_test:
         self.write_report(6,wr_dataA_lo);
         cmd = ((reB & 0x1)<<35) | ((weB & 0x1)<<34) | ((reA & 0x1)<<33) | ((weA & 0x1)<<32) | ((beB & 0xf)<<28) | ((addrB & 0x7fff)<<13) | (addrA & 0x1fff)
         self.write_report(4,cmd)
+        if(weA): # ram[] is 32b wide so split 128b writes
+            self.ram[addrA*4+0] = (wr_dataA_lo>> 0) & 0xffffffffffffffff
+            self.ram[addrA*4+1] = (wr_dataA_lo>>64) & 0xffffffffffffffff
+            self.ram[addrA*4+2] = (wr_dataA_hi>> 0) & 0xffffffffffffffff
+            self.ram[addrA*4+3] = (wr_dataA_hi>>64) & 0xffffffffffffffff
+        if(weB):
+            # TODO model byte enables
+            self.ram[addrB] = wr_dataB
+        if(reA):
+            self.respAlo.append((self.ram[addrA*4+1]<<32) | self.ram[addrA*4+0])
+            self.respAhi.append((self.ram[addrA*4+3]<<32) | self.ram[addrA*4+2])
+        if(reB):
+            self.respB.append(self.ram[addrB])
 
     def running_sp(self):
         return (self.dbg.read(1)>>4) & 0x1
@@ -113,6 +134,7 @@ class simple_test:
     # Tests for true dual-port BRAM
     def run_test_dpbram(self):
         self.dbg.clear()
+        self.init_ram()
         print("Writing command sequence")
         for j in range(16):  # seqence of writes to Port A and B
             self.write_cmd_dp(0,1, 0,1, j*2+1,j*2, j+200,j+100)
@@ -135,8 +157,9 @@ class simple_test:
     # Tests for multi-width true dual-port BRAM
     def run_test_mwbram(self):
         self.dbg.clear()
+        '''
         print("Writing command sequence")
-        # write_cmd_mw(reB, weB, reA, weA, beB, addrB, addrA, wr_dataB, wr_dataA_hi, wr_dataA_lo):
+        # write_cmd_mw(reB,weB, reA,weA, beB, addrB,addrA, wr_dataB,wr_dataA_hi,wr_dataA_lo):
         for j in range(16):  # seqence of writes to Port A and B
             self.write_cmd_mw(0,1, 0,1, 0xf, (j*2+1)*4,j*2, j | 0x3000,j | 0x2000,j | 0x1000)
         for j in range(16):  # seqence of writes to Port B
@@ -152,11 +175,28 @@ class simple_test:
         for j in range(32):
             d_upper = self.dbg.read(6)
             d_lower = self.dbg.read(5)
-            print("mem[%2d] = 0x%016x 0x%016x" % (j,d_upper,d_lower))
-#        print("Reading values read from port B")
-#        for j in range(16):
-#            d = self.dbg.read(3)
-#            print("mem[%2d] = %d = 0x%08x" % (j*2,d,d))
+            d_upper_check = self.respAhi.pop(0)
+            d_lower_check = self.respAlo.pop(0)
+            correct = (d_upper == d_upper_check) and (d_lower == d_lower_check)
+            self.error = self.error or not(correct)
+            print("mem[%2d] = 0x%016x 0x%016x  check = 0x%016x 0x%016x  -  %s"
+                  % (j,d_upper,d_lower,d_upper_check,d_lower_check,"pass" if (correct) else "**FAIL**"))
+        '''
+        print("Writing command sequence for simultanious writes and reads to the same address")
+        # write_cmd_mw(reB,weB, reA,weA, beB, addrB,addrA, wr_dataB,wr_dataA_hi,wr_dataA_lo):
+        for j in range(16):
+            self.write_cmd_mw(1,1, 0,0, 0xf, j,0, j | 0x4000,0x11111111,0x22222222);
+        print("Run sequence")
+        self.write_report(9,1)
+        while(self.running_mw()):
+            print("Waiting for test sequence to finish")
+        for j in range(16):
+            d = self.dbg.read(7)
+            d_check = self.respB.pop(0)
+            correct = d == d_check
+            self.error = self.error or not(correct)
+            print("mem[%2d] = 0x%08x  check = 0x%08x  -  %s"
+                  % (j, d, d_check, "pass" if (correct) else "**FAIL**"))
         self.dbg.end_simulation()
     
 if __name__ == "__main__":
@@ -175,7 +215,8 @@ if __name__ == "__main__":
     test = simple_test(args.sim)
     for j in range(args.n):
         # test.run_test_spbram() # test single read, single write BRAM
-        test.run_test_mwbram()  # test true dual-port BRAM
+        test.run_test_mwbram()
+        # test.run_test_mwbram()  # test true dual-port BRAM
         if(test.error):
             print("Test %d result: FAIL" % (j))
             exit(-1)
