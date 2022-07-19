@@ -32,34 +32,35 @@
 module VerilogBlockRAM_TrueDualPort_OneCycle
   #(parameter DATA_WIDTH=1, parameter ADDR_WIDTH=1)
    (
-    input [ADDR_WIDTH-1:0] 	ADDR_A, ADDR_B,
-    input [DATA_WIDTH-1:0] 	DI_A, DI_B,
-    input 			WE_A, WE_B, EN_A, EN_B, CLK,
-    output reg [DATA_WIDTH-1:0] DO_A, DO_B,
-    output reg 			DO_VALID_A, DO_VALID_B
+    input [ADDR_WIDTH-1:0] 	     ADDR_A, ADDR_B,
+    input [DATA_WIDTH-1:0] 	     DI_A, DI_B,
+    input 			             WE_A, WE_B, RE_A, RE_B, EN_A, EN_B, CLK,
+    output reg [DATA_WIDTH-1:0]  DO_A, DO_B,
+    output reg 			         DO_VALID_A, DO_VALID_B
     );
    
    (* ramstyle = "m20k" *) reg [DATA_WIDTH-1:0] 	ram [2**ADDR_WIDTH-1:0];
 
-   assign wea = WE_A && EN_A;
-   assign web = WE_B && EN_B;
+   wire wea = WE_A && EN_A;
+   wire web = WE_B && EN_B;
    
    always @ (posedge CLK) begin
       if (wea)
-	 ram[ADDR_A] = DI_A;
+		ram[ADDR_A] = DI_A;
       DO_A <= ram[ADDR_A];
    end
 
    always @ (posedge CLK) begin
       if (web)
-	ram[ADDR_B] = DI_B;
+		ram[ADDR_B] = DI_B;
       DO_B <= ram[ADDR_B];
    end
 
    always @ (posedge CLK) begin
-      DO_VALID_A <= !WE_A && EN_A;
-      DO_VALID_B <= !WE_B && EN_B;
+      DO_VALID_A <= RE_A && EN_A;
+      DO_VALID_B <= RE_B && EN_B;
    end
    
-endmodule // VerilogBlockRAM_OneCycle
+endmodule // VerilogBlockRAM_TrueDualPort_OneCycle
+
 
