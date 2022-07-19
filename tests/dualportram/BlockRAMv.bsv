@@ -49,11 +49,11 @@ endinterface
 // True dual-port block RAM: ports A and B can write or read independently
 interface BlockRamTrueDualPort#(type addr, type data);
   // Port A
-  method Action putA(Bool we, addr a, data d); // initiate read or write (not both)
+  method Action putA(Bool we, Bool re, addr a, data d); // initiate read or write or both
   method data dataOutA;                        // read result returned
   method Bool dataOutValidA;                   // True when read result available
   // Port B
-  method Action putB(Bool we, addr a, data d); // initiate read or write (not both)
+  method Action putB(Bool we, Bool re, addr a, data d); // initiate read or write or both
   method data dataOutB;                        // read result returned
   method Bool dataOutValidB;                   // True when read result available
 endinterface
@@ -102,11 +102,11 @@ import "BVI" VerilogBlockRAM_TrueDualPort_OneCycle =
     parameter ADDR_WIDTH     = valueOf(addrWidth);
     parameter DATA_WIDTH     = valueOf(dataWidth);
 
-    method putA(WE_A, ADDR_A, DI_A) enable (EN_A) clocked_by(clk);
+    method putA(WE_A, RE_A, ADDR_A, DI_A) enable (EN_A) clocked_by(clk);
     method DO_A dataOutA;
     method DO_VALID_A dataOutValidA;
 
-    method putB(WE_B, ADDR_B, DI_B) enable (EN_B) clocked_by(clk);
+    method putB(WE_B, RE_B, ADDR_B, DI_B) enable (EN_B) clocked_by(clk);
     method DO_B dataOutB;
     method DO_VALID_B dataOutValidB;
 
@@ -173,14 +173,13 @@ module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
       "End of timer lifetime.  Panic!");
   endrule
 
-  method Action putA(Bool we, addr a, data d);
+  method Action putA(Bool we, Bool re, addr a, data d);
     if (we)
       begin
 	regFileA.upd(a, d);
 	regFileALastWriteTime.upd(a, timer);
       end
-    else
-      dataOutValidAReg <= True;
+    dataOutValidAReg <= re;
     dataOutAReg <=
       regFileALastWriteTime.sub(a) >= regFileBLastWriteTime.sub(a) ?
         regFileA.sub(a) : regFileB.sub(a);
@@ -188,19 +187,17 @@ module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
   method data dataOutA = dataOutAReg;
   method Bool dataOutValidA = dataOutValidAReg;
 
-  method Action putB(Bool we, addr a, data d);
+  method Action putB(Bool we, Bool re, addr a, data d);
     if (we)
       begin
 	regFileB.upd(a, d);
 	regFileBLastWriteTime.upd(a, timer);
       end
-    else
-      dataOutValidBReg <= True;
+    dataOutValidBReg <= re;
     dataOutBReg <=
       regFileALastWriteTime.sub(a) >= regFileBLastWriteTime.sub(a) ?
         regFileA.sub(a) : regFileB.sub(a);
   endmethod
-
   method data dataOutB = dataOutBReg;
   method Bool dataOutValidB = dataOutValidBReg;
 
@@ -258,11 +255,11 @@ interface BlockRamTrueMixedByteEn#
              type addrB, type dataB,
              numeric type dataBBytes);
   // Port A
-  method Action putA(Bool wr, addrA a, dataA d);
+  method Action putA(Bool we, Bool re, addrA a, dataA d);
   method dataA dataOutA;
   method Bool dataOutValidA; // added to original interface to indicate when data is available
   // Port B
-  method Action putB(Bool wr, addrB a, dataB d, Bit#(dataBBytes) be);
+  method Action putB(Bool we, Bool re, addrB a, dataB d, Bit#(dataBBytes) be);
   method dataB dataOutB;
   method Bool dataOutValidB; // added to original interface to indicate when data is available
 endinterface
@@ -290,6 +287,7 @@ module mkBlockRamTrueMixedBE
   
   // addrB needed during read to select the right word
   Reg#(addrB) save_addrB <- mkReg(unpack(0));
+  Reg#(Bool) dataOutValidBreg <- mkDReg(False);
   Wire#(Maybe#(addrA)) check_addrA <- mkDWire(Invalid);
   Wire#(Maybe#(addrB)) check_addrB <- mkDWire(Invalid);
   
@@ -300,26 +298,28 @@ module mkBlockRamTrueMixedBE
     dynamicAssert(addrA != addrB, "ERROR in mkBlockRamTrueMixedBE: address collision on two writes");
   endrule
   
-  method Action putA(wr, a, d);
+  method Action putA(we, re, a, d);
     Bit#(dwidthA) data = pack(d);
+    $display("mixed dpram putA: we=%1d  re=%1d", we, re);
     for(Integer n=0; n<valueOf(dataABytes); n=n+1)
-	rams[n].putA(wr, pack(a), data[n*8+7:n*8]);
-    if(wr) check_addrA <= tagged Valid a;
+	rams[n].putA(we, re, pack(a), data[n*8+7:n*8]);
+    if(we) check_addrA <= tagged Valid a;
   endmethod
   
-  method Action putB(wr, a, d, be);
+  method Action putB(we, re, a, d, be);
+    $display("mixed dpram putB: we=%1d  re=%1d", we, re);
     for(Integer n=0; n<valueOf(dataBBytes); n=n+1)
-      if(be[n]==1)
-	begin
-	  Bit#(aExtra) bank_select = truncate(pack(a));
-	  Bit#(logdataBBytes) byte_select = fromInteger(n);
-	  Bit#(logdataABytes) bram_select = {bank_select, byte_select};
-	  Bit#(awidthA) addr = truncate(unpack(pack(a) >> valueOf(aExtra)));
-	  Bit#(dwidthB) data = pack(d);
-	  rams[bram_select].putB(wr, addr, data[n*8+7:n*8]);
-	end
+      begin
+	Bit#(aExtra) bank_select = truncate(pack(a));
+	Bit#(logdataBBytes) byte_select = fromInteger(n);
+	Bit#(logdataABytes) bram_select = {bank_select, byte_select};
+	Bit#(awidthA) addr = truncate(unpack(pack(a) >> valueOf(aExtra)));
+	Bit#(dwidthB) data = pack(d);
+	rams[bram_select].putB(we && (be[n]==1), re, addr, data[n*8+7:n*8]);
+      end
     save_addrB <= a;
-    if(wr) check_addrB <= tagged Valid a;
+    dataOutValidBreg <= True;
+    if(we) check_addrB <= tagged Valid a;
   endmethod
   
   method dataA dataOutA;
@@ -340,15 +340,14 @@ module mkBlockRamTrueMixedBE
 	 Bit#(aExtra) bank_select = truncate(pack(save_addrB));
 	 Bit#(logdataBBytes) byte_select = fromInteger(n);
 	 Bit#(logdataABytes) bram_select = {bank_select, byte_select};
-	 b[n] = rams[bram_select].dataOutA;
+	 b[n] = rams[bram_select].dataOutB;
 //	 dynamicAssert(rams[n].dataOutValidB,"ERROR in mkBlockRamTrueMixedBE: Reading byte "+integerToString(n)+" from port A but data is not valid");
        end
      return unpack(pack(b));
   endmethod  
   
-  // just return valid from first RAM since the timing for all of them is the same and all read?
   method Bool dataOutValidA = rams[0].dataOutValidA;
-  method Bool dataOutValidB = rams[0].dataOutValidB;
+  method Bool dataOutValidB = dataOutValidBreg;
 
 endmodule
 	    
