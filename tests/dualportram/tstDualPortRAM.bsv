@@ -144,6 +144,7 @@ module top(Empty);
 	       wr_dataB : data_write[2][31:0], // 32-bits
 	       wr_dataA : {data_write[1],data_write[0]} // 128-bit
 	       };
+//	    $display("multi-width command: reB=%d weB=%d    reA=%d weA=%d   addrB=%4d  wr_dataB=0x%08x",cmd.reB,cmd.weB,cmd.reA,cmd.weA,cmd.addrB,cmd.wr_dataB);
 	    cmdmw.enq(cmd);
 	  end
         else if(r.idx == 6)
@@ -245,20 +246,18 @@ module top(Empty);
 	CmdDpT cmd = cmddp.first;
 	cmddp.deq;
 	if((cmd.weA==1) || (cmd.reA==1))
-	   dpram.putA(cmd.weA==1, cmd.addrA, cmd.wr_dataA);
+	   dpram.putA(cmd.weA==1, cmd.reA==1, cmd.addrA, cmd.wr_dataA);
 	if((cmd.weB==1) || (cmd.reB==1))
-	   dpram.putB(cmd.weB==1, cmd.addrB, cmd.wr_dataB);
+	   dpram.putB(cmd.weB==1, cmd.reB==1, cmd.addrB, cmd.wr_dataB);
       end
     else
       run_sequence_dp[1] <= False;
   endrule
   rule store_reads_dpA(dpram.dataOutValidA);
     rddpA.enq(dpram.dataOutA);
-    $display("dataOutA = %3d", dpram.dataOutA);
   endrule  
   rule store_reads_dpB(dpram.dataOutValidB);
     rddpB.enq(dpram.dataOutB);
-    $display("dataOutB = %3d", dpram.dataOutB);
   endrule  
 
   //----run tests on true dual-port mixed width BRAM with byte enables
@@ -267,24 +266,19 @@ module top(Empty);
       begin
 	CmdMwT cmd = cmdmw.first;
 	cmdmw.deq;
-	if((cmd.weA==1) && (cmd.reA==1))
-	  $display("DEBUG: simultanious write and read to port A is not allowed");
-	else if((cmd.weA==1) || (cmd.reA==1))
-	   mwram.putA(cmd.weA==1, cmd.addrA, cmd.wr_dataA);
-	if((cmd.weB==1) && (cmd.reB==1))
-	  $display("DEBUG: simultanious write and read to port B is not allowed");
-	else if((cmd.weB==1) || (cmd.reB==1))
-	   mwram.putB(cmd.weB==1, cmd.addrB, cmd.wr_dataB, cmd.beB);
+	$display("multi-width command deq: reB=%d weB=%d    reA=%d weA=%d",cmd.reB,cmd.weB,cmd.reA,cmd.weA);
+	if((cmd.weA==1) || (cmd.reA==1))
+	  mwram.putA(cmd.weA==1, cmd.reA==1, cmd.addrA, cmd.wr_dataA);
+	if((cmd.weB==1) || (cmd.reB==1))
+	  mwram.putB(cmd.weB==1, cmd.reB==1, cmd.addrB, cmd.wr_dataB, cmd.beB);
       end
     else
       run_sequence_mw[1] <= False;
   endrule
   rule store_reads_mwA(mwram.dataOutValidA);
     rdmwA.enq(mwram.dataOutA);
-    $display("dataOutA = %3d", mwram.dataOutA);
   endrule  
   rule store_reads_mwB(mwram.dataOutValidB);
     rdmwB.enq(mwram.dataOutB);
-    $display("dataOutB = %3d", mwram.dataOutB);
   endrule  
 endmodule
