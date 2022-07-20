@@ -87,8 +87,17 @@ class simple_test:
             self.ram[addrA*4+2] = (wr_dataA_hi>> 0) & 0xffffffffffffffff
             self.ram[addrA*4+3] = (wr_dataA_hi>>64) & 0xffffffffffffffff
         if(weB):
-            # TODO model byte enables
-            self.ram[addrB] = wr_dataB
+            if(beB==0xf):
+                self.ram[addrB] = wr_dataB
+            else:
+                mask = 0
+                invmask = 0
+                for j in range(4):
+                    if((beB>>j) & 0x1 == 1):
+                        mask = mask | (0xff<<j*8)
+                    else:
+                        invmask = invmask | (0xff<<j*8)
+                self.ram[addrB] = (wr_dataB & mask) | (self.ram[addrB] & invmask)
         if(reA):
             self.respAlo.append((self.ram[addrA*4+1]<<32) | self.ram[addrA*4+0])
             self.respAhi.append((self.ram[addrA*4+3]<<32) | self.ram[addrA*4+2])
@@ -157,7 +166,7 @@ class simple_test:
     # Tests for multi-width true dual-port BRAM
     def run_test_mwbram(self):
         self.dbg.clear()
-        '''
+        
         print("Writing command sequence")
         # write_cmd_mw(reB,weB, reA,weA, beB, addrB,addrA, wr_dataB,wr_dataA_hi,wr_dataA_lo):
         for j in range(16):  # seqence of writes to Port A and B
@@ -181,11 +190,11 @@ class simple_test:
             self.error = self.error or not(correct)
             print("mem[%2d] = 0x%016x 0x%016x  check = 0x%016x 0x%016x  -  %s"
                   % (j,d_upper,d_lower,d_upper_check,d_lower_check,"pass" if (correct) else "**FAIL**"))
-        '''
+        
         print("Writing command sequence for simultanious writes and reads to the same address")
         # write_cmd_mw(reB,weB, reA,weA, beB, addrB,addrA, wr_dataB,wr_dataA_hi,wr_dataA_lo):
         for j in range(16):
-            self.write_cmd_mw(1,1, 0,0, 0xf, j,0, j | 0x4000,0x11111111,0x22222222);
+            self.write_cmd_mw(1,1, 0,0, 0xf, j,0, j | 0x4000,0x1111111111111111,0x2222222222222222)
         print("Run sequence")
         self.write_report(9,1)
         while(self.running_mw()):
@@ -197,6 +206,32 @@ class simple_test:
             self.error = self.error or not(correct)
             print("mem[%2d] = 0x%08x  check = 0x%08x  -  %s"
                   % (j, d, d_check, "pass" if (correct) else "**FAIL**"))
+
+        print("Writing command sequence to test byte writes")
+        # write_cmd_mw(reB,weB, reA,weA, beB, addrB,addrA, wr_dataB,wr_dataA_hi,wr_dataA_lo):
+        # write initial values as 128b values on port A
+        for j in range(4):
+            self.write_cmd_mw(0,0, 0,1, 0x0, 0,j, 0xdeaddead, 0xffffffff,0xffffffff)
+            # self.write_cmd_mw(0,0, 0,1, 0x0, 0,j, 0xdeaddead, 0x0f0e0d0c0b0a0908,0x0706050403020100)
+        # write to even bytes via port B
+        for j in range(16):
+            k = 15-j
+            self.write_cmd_mw(0,1, 0,0, 0xa, j,0, (k<<24) | (k<<8) | 0x20ff10ff, 0xdead0000dead0000, 0xdead0000dead0000)
+        # read back result
+        for j in range(16):
+            self.write_cmd_mw(1,0, 0,0, 0xa, j,0, 0x1413121110, 0xdead0000dead0000, 0xdead0000dead0000)
+        print("Run sequence")
+        self.write_report(9,1)
+        while(self.running_mw()):
+            print("Waiting for test sequence to finish")
+        for j in range(16):
+            d = self.dbg.read(7)
+            d_check = self.respB.pop(0)
+            correct = d == d_check
+            self.error = self.error or not(correct)
+            print("mem[%2d] = 0x%08x  check = 0x%08x  -  %s"
+                  % (j, d, d_check, "pass" if (correct) else "**FAIL**"))
+
         self.dbg.end_simulation()
     
 if __name__ == "__main__":
