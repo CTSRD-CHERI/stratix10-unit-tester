@@ -32,27 +32,27 @@
 module VerilogBlockRAM_TrueDualPort_OneCycle
   #(parameter DATA_WIDTH=1, parameter ADDR_WIDTH=1)
    (
-    input [ADDR_WIDTH-1:0] 	     ADDR_A, ADDR_B,
-    input [DATA_WIDTH-1:0] 	     DI_A, DI_B,
-    input 			             WE_A, WE_B, RE_A, RE_B, EN_A, EN_B, CLK,
+    input [ADDR_WIDTH-1:0]       ADDR_A, ADDR_B,
+    input [DATA_WIDTH-1:0]       DI_A, DI_B,
+    input                        WE_A, WE_B, RE_A, RE_B, EN_A, EN_B, CLK,
     output reg [DATA_WIDTH-1:0]  DO_A, DO_B,
-    output reg 			         DO_VALID_A, DO_VALID_B
+    output reg                   DO_VALID_A, DO_VALID_B
     );
    
-   (* ramstyle = "m20k" *) reg [DATA_WIDTH-1:0] 	ram [2**ADDR_WIDTH-1:0];
+   (* ramstyle = "m20k" *) reg [DATA_WIDTH-1:0]     ram [2**ADDR_WIDTH-1:0];
 
    wire wea = WE_A && EN_A;
    wire web = WE_B && EN_B;
    
    always @ (posedge CLK) begin
       if (wea)
-		ram[ADDR_A] = DI_A;
+        ram[ADDR_A] = DI_A;
       DO_A <= ram[ADDR_A];
    end
 
    always @ (posedge CLK) begin
       if (web)
-		ram[ADDR_B] = DI_B;
+        ram[ADDR_B] = DI_B;
       DO_B <= ram[ADDR_B];
    end
 
@@ -62,5 +62,3 @@ module VerilogBlockRAM_TrueDualPort_OneCycle
    end
    
 endmodule // VerilogBlockRAM_TrueDualPort_OneCycle
-
-
