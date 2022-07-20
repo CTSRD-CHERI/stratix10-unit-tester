@@ -58,7 +58,7 @@ module mkPipeReader(Get#(Bit#(8)));
       begin
 	Bit#(8) c = truncate(pack(i));
 	rxfifo.enq(c);
-	$display("DEBUG: read 0x%02x", c);
+	//$display("DEBUG: read 0x%02x", c);
       end
   endrule
   
@@ -80,7 +80,7 @@ module mkPipeWriter(Put#(Bit#(8)));
   endrule
 
   rule do_write(fdw!=InvalidFile);
-    $display("DEBUG: write 0x%02x", txfifo.first);
+    //$display("DEBUG: write 0x%02x", txfifo.first);
     $fwrite(fdw, "%c", txfifo.first);
     $fflush(fdw);
     txfifo.deq;
