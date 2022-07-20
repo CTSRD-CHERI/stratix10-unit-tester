@@ -161,7 +161,7 @@ module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
   RegFile#(addr, data) regFileB <- mkRegFileFull;
   RegFile#(addr, Bit#(64)) regFileALastWriteTime <- mkRegFileFull;
   RegFile#(addr, Bit#(64)) regFileBLastWriteTime <- mkRegFileFull;
-  Reg#(Bit#(64)) timer <- mkReg(64'haaaaaaaaaaaaaaab); // gross hack due to the above RegFiles being initialsied to this value
+  Reg#(Bit#(64)) timer <- mkReg(64'haaaaaaaaaaaaaaab); // gross hack due to the above RegFiles for LastWriteTime being initialsied to this value
   Reg#(data) dataOutAReg <- mkReg(0);
   Reg#(data) dataOutBReg <- mkReg(0);
   Reg#(Bool) dataOutValidAReg <- mkDReg(False);
@@ -181,6 +181,7 @@ module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
       end
     dataOutValidAReg <= re;
     dataOutAReg <=
+      we && re ? d :  // simulate bypass
       regFileALastWriteTime.sub(a) >= regFileBLastWriteTime.sub(a) ?
         regFileA.sub(a) : regFileB.sub(a);
   endmethod
@@ -195,7 +196,8 @@ module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
       end
     dataOutValidBReg <= re;
     dataOutBReg <=
-      regFileALastWriteTime.sub(a) >= regFileBLastWriteTime.sub(a) ?
+        we && re ? d :  // simulate bypass
+        regFileALastWriteTime.sub(a) >= regFileBLastWriteTime.sub(a) ?
         regFileA.sub(a) : regFileB.sub(a);
   endmethod
   method data dataOutB = dataOutBReg;
@@ -286,8 +288,8 @@ module mkBlockRamTrueMixedBE
   Vector#(dataABytes, BlockRamTrueDualPort#(Bit#(awidthA), Bit#(8))) rams <- replicateM(mkDualPortBlockRAM);
   
   // addrB needed during read to select the right word
-  Reg#(addrB) save_addrB <- mkReg(unpack(0));
-  Reg#(Bool) dataOutValidBreg <- mkDReg(False);
+  Reg#(addrB)           save_addrB <- mkReg(unpack(0));
+  Reg#(Bool)      dataOutValidBreg <- mkDReg(False);
   Wire#(Maybe#(addrA)) check_addrA <- mkDWire(Invalid);
   Wire#(Maybe#(addrB)) check_addrB <- mkDWire(Invalid);
   
@@ -316,9 +318,10 @@ module mkBlockRamTrueMixedBE
 	Bit#(awidthA) addr = truncate(unpack(pack(a) >> valueOf(aExtra)));
 	Bit#(dwidthB) data = pack(d);
 	rams[bram_select].putB(we && (be[n]==1), re, addr, data[n*8+7:n*8]);
+	$display("Write to ram[%d]",bram_select);
       end
     save_addrB <= a;
-    dataOutValidBreg <= True;
+    dataOutValidBreg <= re;
     if(we) check_addrB <= tagged Valid a;
   endmethod
   
@@ -327,23 +330,25 @@ module mkBlockRamTrueMixedBE
     for(Integer n=0; n<valueOf(dataABytes); n=n+1)
       begin
 	b[n] = rams[n].dataOutA;
-	 let v = rams[n].dataOutValidA;
+// Actions are not possible in none Action methods, so no assertions :(
+//	 let v = rams[n].dataOutValidA;
 //	 dynamicAssert(v,"ERROR in mkBlockRamTrueMixedBE: Reading byte ");  //+integerToString(n)+" from port A but data is not valid");
        end
     return unpack(pack(b));
   endmethod
      
   method dataB dataOutB;
-     Vector#(dataBBytes,Bit#(8)) b;
-     for(Integer n=0; n<valueOf(dataBBytes); n=n+1)
-       begin
-	 Bit#(aExtra) bank_select = truncate(pack(save_addrB));
-	 Bit#(logdataBBytes) byte_select = fromInteger(n);
-	 Bit#(logdataABytes) bram_select = {bank_select, byte_select};
-	 b[n] = rams[bram_select].dataOutB;
+    Vector#(dataBBytes,Bit#(8)) b;
+    for(Integer n=0; n<valueOf(dataBBytes); n=n+1)
+      begin
+	Bit#(aExtra) bank_select = truncate(pack(save_addrB));
+	Bit#(logdataBBytes) byte_select = fromInteger(n);
+	Bit#(logdataABytes) bram_select = {bank_select, byte_select};
+	b[n] = rams[bram_select].dataOutB;
+// Actions are not possible in none Action methods, so no assertions :(
 //	 dynamicAssert(rams[n].dataOutValidB,"ERROR in mkBlockRamTrueMixedBE: Reading byte "+integerToString(n)+" from port A but data is not valid");
-       end
-     return unpack(pack(b));
+      end
+    return unpack(pack(b));
   endmethod  
   
   method Bool dataOutValidA = rams[0].dataOutValidA;
