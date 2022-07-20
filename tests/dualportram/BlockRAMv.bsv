@@ -32,6 +32,7 @@ import Vector  :: *;
 import Assert  :: *;
 import RegFile :: *;
 import DReg    :: *;
+import BRAMCore:: *;
 
 // ==========
 // Interfaces
@@ -150,8 +151,40 @@ endmodule
 `endif
 
 `ifdef SIMULATE
-// Matt Naylor's dual-port BRAM using RegFile, for simulation only
+// True dual port block RAM for simulation only.  Uses BRAMCore library.
 module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
+  provisos(Bits#(addr, addrWidth),
+	   Bits#(data, dataWidth),
+	   Bounded#(addr),
+	   Literal#(data));
+  
+  BRAM_DUAL_PORT#(addr,data) ram <- mkBRAMCore2(valueOf(TExp#(addrWidth)), False);
+  Reg#(Bool) dataOutValidAReg <- mkDReg(False);
+  Reg#(Bool) dataOutValidBReg <- mkDReg(False);
+
+  method Action putA(Bool we, Bool re, addr a, data d);
+    ram.a.put(we, a, d);
+    dataOutValidAReg <= re;
+  endmethod
+  
+  method Action putB(Bool we, Bool re, addr a, data d);
+    ram.b.put(we, a, d);
+    dataOutValidBReg <= re;
+  endmethod
+
+  method data dataOutA = ram.a.read;
+  method data dataOutB = ram.b.read;
+
+  method Bool dataOutValidA = dataOutValidAReg;
+  method Bool dataOutValidB = dataOutValidBReg;
+  
+endmodule
+`endif
+
+/*
+`ifdef SIMULATE
+// Matt Naylor's dual-port BRAM using RegFile, for simulation only
+module mkDualPortBlockRAM_Bluesim_Matt(BlockRamTrueDualPort#(addr, data))
   provisos(Bits#(addr, addrWidth),
 	   Bits#(data, dataWidth),
 	   Bounded#(addr),
@@ -205,6 +238,8 @@ module mkDualPortBlockRAM_Bluesim(BlockRamTrueDualPort#(addr, data))
 
 endmodule
 `endif
+*/
+
   
 // ================================================
 // Select memory primative based on simulation mode
