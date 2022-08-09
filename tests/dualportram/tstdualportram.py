@@ -36,9 +36,10 @@ import fpga_debug_interface
 import argparse
 
 class simple_test:
-    def __init__(self, simulation_mode):
+    def __init__(self, simulation_mode, cable_name):
         self.error = False
-        self.dbg = fpga_debug_interface.debug_interface(sim=simulation_mode)  # True=simulate, False=on FPGA
+        self.dbg = fpga_debug_interface.debug_interface(sim=simulation_mode,  # True=simulate, False=on FPGA
+                                                        cable_name = cable_name, device_nr = -1, instance_nr = -1)
         self.init_ram()
 
     def init_ram(self):
@@ -262,6 +263,7 @@ if __name__ == "__main__":
     group.add_argument('--fpga', help='test on FPGA', action="store_true")
     group.add_argument('--sim', help='test in simulation (Icarus Verilog)', action="store_true")
     parser.add_argument('--n', help='number of iterations', type=int, default=1)
+    parser.add_argument('--cable', help='FPGA cable name (from jtagconfig, e.g. "DE10-Pro [5-2.3.1]")', type=str, default=None)
     args = parser.parse_args()
     if not((args.fpga and not(args.sim)) or (not(args.fpga) and args.sim)):
         parser.error('Select --fpga or --sim')
@@ -269,7 +271,7 @@ if __name__ == "__main__":
         print("FPGA test starting for %d iterations" % (args.n))
     if(args.sim):
         print("Simulation starting for %d iterations" % (args.n))
-    test = simple_test(args.sim)
+    test = simple_test(simulation_mode=args.sim, cable_name=args.cable)
     for j in range(args.n):
         # test.run_test_spbram() # test single read, single write BRAM
         # run multi-width BRAM tests but disable simultanious write port A, read port B test since it fails in simulation

@@ -51,12 +51,12 @@ class DebugResponseCode(Enum):
     Rsp_invalid       = 255
 
 class debug_interface:
-    def __init__(self, sim=True):
+    def __init__(self, sim=True, cable_name = None, device_nr = -1, instance_nr = -1):
         self.sim_mode = sim
         if(sim):
             self.pipe = fpga_debug_pipe_sim.pipe_interface()
         else:
-            self.pipe = fpga_debug_pipe_fpga.pipe_interface()
+            self.pipe = fpga_debug_pipe_fpga.pipe_interface(cable_name = cable_name, device_nr = device_nr, instance_nr = instance_nr)
 
     def assert_checksum(self, packet_list, error_message):
         checksum = self.pipe.calc_checksum(packet_list[0:-1])
