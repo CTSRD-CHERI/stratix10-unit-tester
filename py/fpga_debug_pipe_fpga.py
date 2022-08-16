@@ -34,7 +34,7 @@ from functools import reduce
 
 class pipe_interface:
     def __init__(self, cable_name = None, device_nr = -1, instance_nr = -1):
-        print("DEBUG: cable_name=%s, device_nr=%d, instance_nr=%d"%("None" if cable_name==None else cable_name,device_nr,instance_nr))
+        # print("DEBUG: cable_name=%s, device_nr=%d, instance_nr=%d"%("None" if cable_name==None else cable_name,device_nr,instance_nr))
         self.uart = intel_jtag_uart.intel_jtag_uart(cable_name = cable_name, device_nr = device_nr, instance_nr = instance_nr)
         self.read_buf = list()
 
