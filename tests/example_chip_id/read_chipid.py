@@ -30,26 +30,43 @@
 # ----------------------------------------------------------------------------
 # Simple test of FPGADebugInterface
 
-import sys
+import sys, os
+import subprocess as sp
 sys.path.append(r'../../py')
 import fpga_debug_interface
 import argparse
+import progallde10pro
+
+canned_sof = 'prebuilt_image.sof'
 
 if __name__ == "__main__":
-    # keep arguments to be consistent with other tests even though
-    # --fpga is the only valid option
     parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--fpga', help='test on FPGA', action="store_true")
-    group.add_argument('--sim', help='test in simulation (Icarus Verilog)', action="store_true")
+    devices = progallde10pro.find_de10pro_devices()
+    k = list(devices.keys())
+    device_zero = '' if(len(k)==0) else k[0]
+    parser.add_argument('-p', '--program_fpgas', action='store_true', help='program FPGAs')
+    parser.add_argument('-b', '--bitimage', type=str, action='store', default=canned_sof,
+                        help='specify SOF file to program (defaults to %s)'%(canned_sof))
+    parser.add_argument('-s', '--sequential', action='store_true', default=False,
+                        help='program FPGAs sequentially')
+    group = parser.add_mutually_exclusive_group() 
+    group.add_argument('-a', '--all', action='store_true', default=False, help='Read ID from all FPGAs')
+    group.add_argument('-c', '--cable', type=str, action='store', default=device_zero,
+              help='Specify cable corresponding to FPGA (obtained from jtagconfig, e.g. "DE10-Pro [5-2.3.1]")')
     args = parser.parse_args()
-    if not((args.fpga and not(args.sim)) or (not(args.fpga) and args.sim)):
-        parser.error('Select --fpga or --sim')
-    if(args.fpga):
-        dbg = fpga_debug_interface.debug_interface(False)  # True=simulate, False=on FPGA
-        print("Reading ChipID: 0x%016x" % (dbg.read(0)))
-    if(args.sim):
-        print("ERROR: Simulation is not an option for this test")
-        exit(-1)
+    if(args.program_fpgas):
+        print("Programming all DE10Pro FPGA boards with %s image"%(args.bitimage))
+        if(args.bitimage==canned_sof):
+            if(not(os.path.exists(canned_sof)) and os.path.exists(canned_sof+'.bz2')):
+                sp.run(['bunzip2','-k',canned_sof+'.bz2'], timeout=20, check=True)
+        process_list = progallde10pro.spawn_quartus_pgm(devices=devices,sof=args.bitimage,sequential=args.sequential)
+        progallde10pro.report_process_status(devices, process_list)
+    if(args.all):
+        cables = devices.keys()
+    else:
+        cables = [args.cable]
+    for c in cables:
+        dbg = fpga_debug_interface.debug_interface(sim=False, cable_name=c)
+        print("Cable: %s, ChipID: 0x%016x" % (c,dbg.read(0)))
     
 exit(0)
