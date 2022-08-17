@@ -52,22 +52,29 @@ def spawn_quartus_pgm(devices,sof,sequential):
     return process_list
 
 def report_process_status(devices, process_list):
+    error_report = {}
     for d in devices.keys():
+        error = False
         proc = process_list.pop(0)
         try:
             proc.wait(timeout=quartus_pgm_timeout)
         except:
             print("%s: ERROR: Process programming timed out"%(d))
+            error = True
             proc.kill()
         else:
             report=[]
             so = proc.communicate()[0].decode()
             for l in so.split('\n'):
+                error = error or re.match("\W+Error", l)
                 if(   re.match("Info: Quartus Prime Programmer was", l)
                    or re.match("\W+Info: Elapsed time", l)
                    or re.match("\W+Error", l)):
                     report.append(d+": "+l)
             print('\n'.join(report))
+        finally:
+            error_report[d] = error
+    return error_report
 
 def main():
     global quartus_pgm_timeout
@@ -97,10 +104,25 @@ def main():
         return(1)
     if(args.sequential):
         print("Programming sequentially")
-    process_list = spawn_quartus_pgm(devices=devices,sof=args.sof,sequential=args.sequential)
-    report_process_status(devices, process_list)
+    timeout = 4
+    any_errors = True
+    sequential = args.sequential
+    while((timeout>0) and (any_errors)):
+        process_list = spawn_quartus_pgm(devices=devices,sof=args.sof,sequential=args.sequential)
+        error_report = report_process_status(devices, process_list)
+        any_errors = False
+        for d in error_report.keys():
+            if(error_report[d]):
+                print("PROGRAMMING ERROR: FPGA %s failed to program, will retry"%(d))
+                any_errors = True
+                sequential = True
+            else:
+                devices.pop(d)
+    if(any_errors):
+        print("FATAL ERROR: failed to program one or more FPGAs")
+    return 1 if any_errors else 0
 
-    
+
 if __name__ == '__main__':
     start = time.time()
     status = main()
